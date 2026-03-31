@@ -1,62 +1,88 @@
 # Sovereign Intelligence Engine
 
-A unified ontology platform that aggregates data from 13+ public sources into a single object graph. Built with FastAPI, PostgreSQL (pgvector), React, and an AI agent powered by Claude.
+A knowledge graph platform that aggregates 50 tech companies from 20+ public data sources into a unified ontology with AI agent, ML anomaly detection, and real-time market data.
 
-![Dashboard](https://img.shields.io/badge/stack-FastAPI%20%2B%20React%20%2B%20PostgreSQL-blue)
+![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20React%20%2B%20PostgreSQL-blue)
 ![Python](https://img.shields.io/badge/python-3.12-green)
-![Tests](https://img.shields.io/badge/tests-82%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-129%20passed-brightgreen)
+![Sources](https://img.shields.io/badge/data%20sources-20+-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## What it does
 
-Sovereign takes 50 tech companies and enriches them from multiple public data sources — Wikipedia, GitHub, SEC EDGAR, Alpha Vantage, HuggingFace, Hacker News, and more. Every company becomes a unified object with properties merged from all sources, connected via a graph of relationships.
+Sovereign takes 50 tech companies and enriches them from 8+ data sources — Wikipedia, GitHub, SEC EDGAR/XBRL, Alpha Vantage, Wikidata, HuggingFace, Hacker News, and Forbes. Each company becomes a unified object with merged properties, connected via a knowledge graph of relationships (CEO links, competitor links, article mentions, repo ownership).
 
-An AI agent (Claude) can query this live database using 11 tools — from ontology search to real-time market data and news.
+An AI agent (Claude) queries this live database using 14 tools — ontology search, real-time market data, news, research papers, and ML-powered anomaly detection.
 
 ```
-User: "How does Apple's GitHub activity compare to Microsoft?"
+User: "Which AI companies have the most GitHub activity and how does
+       that correlate with their HuggingFace model output?"
 
-Agent: [search_objects] → [compare_objects] → [get_links]
+Agent: [search_objects] → [compare_objects] → [rank_objects]
 
-Apple:  580 repos, 20 linked repos, 4 sources
-Microsoft: 4,800+ repos, GitHub org with 221k employees
-...structured comparison with real data
+Google:     4800 repos, 20 HF models, 580k followers
+Microsoft:  4200 repos, 20 HF models, 221k followers
+Meta:       1200 repos, 20 HF models, facebookresearch
+...structured comparison with real data from live DB
 ```
 
 ## Architecture
 
 ```
-Frontend (React + Vite)          Backend (FastAPI)           Jobs (ARQ Worker)
-├── Dashboard                    ├── /objects                ├── sync_wikipedia
-├── Graph Explorer (Dagre)       ├── /graph                  ├── sync_github
-├── Search (autocomplete)        ├── /search + /suggest      ├── sync_alpha_vantage
-├── AI Agent Chat                ├── /insights               ├── sync_sec
-└── Tailwind "Sovereign" UI      ├── /sync                   ├── sync_huggingface
-                                 └── /chat (WebSocket)       ├── sync_hn_algolia
-                                                             └── compute_derived
-Storage
-├── PostgreSQL + pgvector (objects, links, embeddings)
-├── Redis (API cache, job queue)
-└── Raw Snapshots (every API response archived)
+Frontend (React + Vite)           Backend (FastAPI)              Jobs (ARQ Worker)
+├── Dashboard (KPIs, trending)    ├── /objects (CRUD)            ├── sync_wikipedia
+├── Feed (live event stream)      ├── /graph (traversal)         ├── sync_github
+├── Graph (Cytoscape.js)          ├── /search + /suggest         ├── sync_sec + sec_financials
+├── Search (autocomplete)         ├── /insights (15 endpoints)   ├── sync_alpha_vantage
+├── Agent (Claude chat)           ├── /sync (20 sources)         ├── sync_wikidata
+├── Markets (macro + commodities) ├── /chat (WebSocket)          ├── sync_huggingface
+├── Entities (type browser)       └── ML endpoints               ├── sync_hn_algolia
+├── Schema (ontology viz)                                        ├── compute_sentiment
+└── Alerts (Z-score anomalies)    Storage                        ├── compute_embeddings
+                                  ├── PostgreSQL + pgvector       ├── compute_clusters
+                                  ├── Redis (cache + queue)       └── extract_persons
+                                  └── Raw Snapshots
 ```
+
+## Key Numbers
+
+| Metric | Value |
+|--------|-------|
+| Companies | 53 (50 seeded + 3 from Forbes) |
+| Total Objects | 2,900+ (companies, persons, articles, repos, events, macro indicators) |
+| Total Links | 3,200+ |
+| Object Types | 7 (company, person, article, repository, event, macro_indicator, country) |
+| Link Types | 5 active (mentions, owns_repo, filed, is_ceo_of, competitor_of) |
+| Data Sources | 8 on companies (Wikipedia, SEC, GitHub, Alpha Vantage, Wikidata, HuggingFace, Forbes, SEC XBRL) |
+| Persons | 26 CEOs extracted |
+| Competitor Links | 345 (SIC + sector + 11 industry clusters) |
+| Agent Tools | 14 |
+| Tests | 129 |
 
 ## Data Sources
 
-| Source | Data | Auth |
-|--------|------|------|
-| Wikipedia | Descriptions, founding dates | None |
-| GitHub | Repos, stars, forks, languages | Token (optional) |
-| SEC EDGAR | Filings, CIK, SIC codes | None |
-| Alpha Vantage | Market cap, PE, EPS, revenue, sector | Free key |
-| HuggingFace | AI models, downloads, likes | None |
-| HN Algolia | Tech articles, scores, comments | None |
-| Forbes/Fortune 500 | Revenue, employees, rank | None |
-| ArXiv | Academic papers | None |
-| npm / PyPI | Package stats, downloads | None |
-| FRED | Interest rates, GDP, inflation | Free key |
-| EIA | Oil, gas, electricity prices | Free key |
-| Google News | Real-time news (via Agent) | None |
-| Yahoo Finance | Real-time quotes (via Agent) | None |
+| Source | Data | Auth | Status |
+|--------|------|------|--------|
+| Wikipedia | Descriptions, founding dates, HQ | None | Live |
+| Wikidata SPARQL | CEOs, founders, employees, founding year | None | Live |
+| GitHub | Repos, stars, forks, followers | Token (optional) | Live |
+| SEC EDGAR | Filings, CIK, SIC codes, executives | None | Live |
+| SEC XBRL | Revenue, net income, assets, R&D, EPS | None | Live |
+| Alpha Vantage | Market cap, PE, EPS, revenue, sector | Free key | Live |
+| HuggingFace | AI models, downloads, likes | None | Live |
+| HN Algolia | Tech articles with scores, comments | None | Live |
+| Forbes/Fortune 500 | Revenue, employees, rank | None | Live (local CSV) |
+| ArXiv | Academic papers (XML) | None | Ready |
+| npm / PyPI | Package stats, downloads | None | Ready |
+| World Bank | GDP, inflation, unemployment (10 countries) | None | Live |
+| Semantic Scholar | Research papers, citations | None | Ready |
+| REST Countries | 250 countries with borders, population | None | Ready |
+| GDELT | Global news intelligence | None | Ready |
+| Commodities | Gold, silver, copper spot prices | None | Ready |
+| FRED | Interest rates, GDP, inflation | Free key | Ready |
+| EIA | Oil, gas, electricity prices | Free key | Ready |
+| Google News | Real-time news (via Agent) | None | Live |
+| Yahoo Finance | Real-time quotes (via Agent) | None | Live |
 
 ## Quick Start
 
@@ -69,8 +95,8 @@ Storage
 
 ```bash
 # Clone
-git clone https://github.com/YOUR_USERNAME/sovereign-ontology.git
-cd sovereign-ontology
+git clone https://github.com/AlsoTheZv3n/ontology.git
+cd ontology
 
 # Configure
 cp .env.example .env
@@ -79,28 +105,43 @@ cp .env.example .env
 # Build & run
 docker-compose up -d
 
-# Wait for healthy containers, then seed data
+# Wait for healthy containers (~30s), then seed data
 curl -X POST http://localhost:8001/sync/wikipedia
-curl -X POST http://localhost:8001/sync/github
 curl -X POST http://localhost:8001/sync/sec
+curl -X POST http://localhost:8001/sync/sec_financials
 curl -X POST http://localhost:8001/sync/hn_algolia
 curl -X POST http://localhost:8001/sync/huggingface
+curl -X POST http://localhost:8001/sync/wikidata
 curl -X POST http://localhost:8001/sync/forbes
+curl -X POST http://localhost:8001/sync/persons
+curl -X POST http://localhost:8001/sync/competitors
 curl -X POST http://localhost:8001/sync/derived
+curl -X POST http://localhost:8001/sync/clusters
+```
+
+If you have an Alpha Vantage key (free, instant):
+```bash
+curl -X POST http://localhost:8001/sync/yahoo_finance
 ```
 
 ### Access
 
-| Service | URL |
-|---------|-----|
-| Dashboard | http://localhost:5174 |
-| API Docs (Swagger) | http://localhost:8001/docs |
-| Graph Explorer | http://localhost:5174/graph |
-| AI Agent | http://localhost:5174/chat |
+| Page | URL | Description |
+|------|-----|-------------|
+| Dashboard | http://localhost:5174 | KPIs, trending, source coverage |
+| Feed | http://localhost:5174/feed | Live event stream |
+| Graph | http://localhost:5174/graph | Cytoscape network explorer |
+| Search | http://localhost:5174/search | Autocomplete + relevance ranking |
+| Agent | http://localhost:5174/chat | Claude AI with 14 tools |
+| Markets | http://localhost:5174/markets | Macro indicators + company financials |
+| Entities | http://localhost:5174/entities | Browse by object type |
+| Schema | http://localhost:5174/schema | Ontology link types visualization |
+| Alerts | http://localhost:5174/alerts | Z-score anomaly detection |
+| API Docs | http://localhost:8001/docs | Swagger/OpenAPI |
 
 ## Agent Tools
 
-The AI agent has 11 tools that query live data:
+The AI agent has 14 tools that query live data:
 
 | Tool | What it does |
 |------|-------------|
@@ -111,96 +152,105 @@ The AI agent has 11 tools that query live data:
 | `rank_objects` | Top-N ranking by any numeric property |
 | `get_anomalies` | Find objects with missing data sources |
 | `get_timeline` | Chronological events for a company |
-| `get_market_data` | Live stock/commodity/crypto prices |
-| `search_news` | Real-time news via Google News |
+| `get_market_data` | Live stock/commodity/crypto prices (Yahoo Finance chart API) |
+| `search_news` | Real-time news via Google News RSS |
 | `search_research` | ArXiv papers + HuggingFace models |
 | `get_package_stats` | npm/PyPI package statistics |
+| `get_sentiment_trend` | FinBERT sentiment from company articles |
+| `get_clusters` | K-Means company groupings by financial/tech profile |
+| `detect_anomalies_metric` | Z-score anomalies for any metric |
+
+## ML Pipeline
+
+| Module | What it does | Status |
+|--------|-------------|--------|
+| `ml/analytics.py` | K-Means clustering, Z-score anomaly detection, linear forecasting | **Live** (scikit-learn) |
+| `ml/finbert.py` | Financial sentiment: positive/negative/neutral | Ready (needs `transformers`) |
+| `ml/ner.py` | Named entity recognition: persons, orgs, locations | Ready (needs `spacy`) |
+| `ml/embeddings.py` | 384-dim vectors for pgvector similarity search | Ready (needs `sentence-transformers`) |
+
+All modules gracefully degrade — the system never crashes if models aren't installed.
+
+To enable heavy ML models:
+```bash
+# Uncomment in requirements.txt, then:
+docker-compose build backend   # ~15 min (downloads models)
+docker-compose up -d backend worker
+curl -X POST http://localhost:8001/sync/sentiment
+curl -X POST http://localhost:8001/sync/embeddings
+```
 
 ## API Endpoints
 
 ```
-GET  /objects                       List objects (filter by type, missing source)
-GET  /objects/{key}                 Single object with all properties
-GET  /objects/{key}/links           Connected objects
-GET  /objects/{key}/timeline        Chronological events
+Objects & Graph
+  GET  /objects                         List objects (filter by type, missing source)
+  GET  /objects/{key}                   Single object with all properties
+  GET  /objects/{key}/links             Connected objects with labels
+  GET  /objects/{key}/timeline          Chronological events
+  GET  /graph?root={key}&depth=2        Subgraph for visualization
 
-GET  /graph?root={key}&depth=2      Subgraph for visualization
-GET  /search?q={term}               Full-text search with relevance ranking
-GET  /search/suggest?q={prefix}     Autocomplete suggestions
+Search
+  GET  /search?q={term}                 Relevance-ranked search
+  GET  /search/suggest?q={prefix}       Autocomplete suggestions
+  GET  /search/similar/{key}            pgvector similarity search
 
-GET  /insights/stats                Dashboard KPIs
-GET  /insights/trending             Companies by HN mentions + trend %
-GET  /insights/top?metric=market_cap Top companies by metric
-GET  /insights/anomalies            Missing source coverage
-GET  /insights/movers               Recently updated companies
-GET  /insights/stale?hours=24       Objects not synced recently
+Insights
+  GET  /insights/stats                  Dashboard KPIs + source coverage
+  GET  /insights/trending               Companies by HN mentions + trend %
+  GET  /insights/top?metric=market_cap  Top companies by metric
+  GET  /insights/anomalies              Missing source coverage
+  GET  /insights/movers                 Recently updated companies
+  GET  /insights/stale?hours=24         Objects not synced recently
+  GET  /insights/feed                   Live event stream
+  GET  /insights/schema                 Ontology link types + counts
+  GET  /insights/entities?type=company  Browse entities by type
+  GET  /insights/markets                Macro indicators + company financials
+  GET  /insights/alerts                 Z-score anomaly alerts
+  GET  /insights/clusters               K-Means company clusters
+  GET  /insights/sentiment/{key}        Article sentiment trend
+  GET  /insights/forecast/{key}/{metric} Linear forecast
 
-POST /sync/{source}                 Trigger manual sync
-GET  /sync/sources                  List available sources
+Sync
+  POST /sync/{source}                   Trigger sync (20 sources available)
+  GET  /sync/sources                    List all sources
 
-WS   /chat/ws                       Agent chat (WebSocket)
-GET  /health                        Health check
+Chat
+  WS   /chat/ws                         Agent chat (WebSocket)
+  GET  /health                          Health check
 ```
 
 ## Project Structure
 
 ```
 ├── backend/
-│   ├── api/
-│   │   ├── main.py                 FastAPI app + lifespan
-│   │   ├── deps.py                 Dependency injection
-│   │   └── routes/
-│   │       ├── objects.py          CRUD endpoints
-│   │       ├── graph.py            Graph traversal
-│   │       ├── search.py           Search + autocomplete
-│   │       ├── insights.py         Trending, anomalies, stats
-│   │       ├── sync.py             Manual sync triggers
-│   │       ├── agent.py            11 tool definitions + agentic loop
-│   │       └── chat.py             WebSocket endpoint
-│   ├── connectors/                 15 data source connectors
+│   ├── api/routes/                  7 route modules (objects, graph, search, insights, sync, agent, chat)
+│   ├── connectors/                  20 data source connectors
 │   ├── transform/
-│   │   ├── mappers/                Object type mappers
-│   │   ├── resolver.py             Entity resolution (fuzzy matching)
-│   │   └── derived.py              Computed properties
-│   ├── store/
-│   │   ├── writer.py               Upsert objects/links
-│   │   ├── reader.py               Query + graph traversal
-│   │   └── cache.py                Redis response cache
-│   ├── jobs/
-│   │   ├── tasks.py                All sync tasks
-│   │   └── worker.py               ARQ worker + cron schedule
-│   ├── schemas/
-│   │   ├── objects.py              Pydantic models
-│   │   └── seed.py                 50 company definitions
-│   ├── agents/
-│   │   ├── docs_fetcher.py         API documentation collector
-│   │   └── api_key_agent.py        Playwright MCP agent config
-│   ├── db/init.sql                 PostgreSQL schema
-│   └── tests/                      82 tests
+│   │   ├── mappers/                 5 object type mappers (company, person, article, repo, event)
+│   │   ├── resolver.py              Entity resolution (fuzzy matching, iterative suffix stripping)
+│   │   ├── derived.py               Innovation score, source coverage
+│   │   ├── person_extractor.py      CEO extraction from company properties
+│   │   └── competitor_resolver.py   SIC + sector + 11 industry cluster matching
+│   ├── ml/
+│   │   ├── analytics.py             K-Means, Z-score anomalies, linear forecast (scikit-learn)
+│   │   ├── finbert.py               Financial sentiment (FinBERT, optional)
+│   │   ├── ner.py                   Named entity recognition (spaCy, optional)
+│   │   └── embeddings.py            Sentence embeddings (MiniLM, optional)
+│   ├── store/                       Writer (upsert), Reader (queries + graph BFS), Cache (Redis)
+│   ├── jobs/                        ARQ worker with 20 sync tasks + 3 ML tasks + cron schedule
+│   ├── schemas/                     Pydantic models + 50 company seed data
+│   ├── agents/                      API docs fetcher + Playwright MCP agent config
+│   ├── db/init.sql                  PostgreSQL schema (objects, links, raw_snapshots, pgvector)
+│   └── tests/                       129 tests
 ├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── Layout.tsx          Sidebar navigation
-│   │   │   ├── GraphView.tsx       React Flow + Dagre layout
-│   │   │   ├── GraphFilterPanel.tsx Node/link type filters
-│   │   │   ├── SearchBar.tsx       Autocomplete search
-│   │   │   ├── ObjectCard.tsx      Object display card
-│   │   │   ├── SourceBadge.tsx     Data source indicator
-│   │   │   ├── ToolCallBadge.tsx   Agent tool call display
-│   │   │   ├── Markdown.tsx        Markdown renderer
-│   │   │   └── InsightsFeed.tsx    Anomaly feed
-│   │   ├── pages/
-│   │   │   ├── Dashboard.tsx       KPIs, charts, trending
-│   │   │   ├── Graph.tsx           Graph explorer
-│   │   │   ├── Company.tsx         Company detail view
-│   │   │   ├── Search.tsx          Search results
-│   │   │   └── Chat.tsx            AI agent interface
-│   │   ├── hooks/
-│   │   │   ├── useOntology.ts      React Query hooks
-│   │   │   └── useChat.ts          WebSocket chat hook
-│   │   └── lib/api.ts              Typed API client
-│   └── tailwind.config.js          "Sovereign" design system
-├── docker-compose.yml
+│   │   ├── components/              10 components (Layout, GraphView, SearchBar, Markdown, etc.)
+│   │   ├── pages/                   10 pages (Dashboard, Feed, Graph, Search, Chat, Markets, etc.)
+│   │   ├── hooks/                   useOntology (React Query) + useChat (WebSocket)
+│   │   └── lib/api.ts               Typed API client
+│   └── tailwind.config.js           "Sovereign Intelligence" design system
+├── docker-compose.yml               5 services: postgres, redis, backend, worker, frontend
 ├── .env.example
 └── README.md
 ```
@@ -208,32 +258,44 @@ GET  /health                        Health check
 ## Testing
 
 ```bash
-# Backend (82 tests)
+# Backend (129 tests)
 docker exec ontology-backend-1 python -m pytest tests/ -v
 
-# Frontend
-docker exec ontology-frontend-1 npm test
+# Covers: API endpoints, all connectors (httpx mock), transform/mappers,
+#         entity resolution, derived properties, ML analytics, cache layer
 ```
 
 ## Optional API Keys
 
-The platform works without any keys (Wikipedia, GitHub public API, SEC, HN are all free). For richer data:
+The platform works without any keys. For richer data:
 
 | Key | What it unlocks | How to get |
 |-----|----------------|------------|
+| `ANTHROPIC_API_KEY` | AI agent chat (14 tools) | console.anthropic.com |
 | `GITHUB_TOKEN` | 5000 req/h (vs 60), all 50 companies | github.com/settings/tokens |
-| `ALPHA_VANTAGE_KEY` | Market cap, PE ratio, revenue, sector | alphavantage.co (free, instant) |
-| `ANTHROPIC_API_KEY` | AI agent chat | console.anthropic.com |
+| `ALPHA_VANTAGE_KEY` | Market cap, PE, EPS, revenue, sector | alphavantage.co (free, instant) |
 | `FRED_API_KEY` | Interest rates, GDP, inflation | fredaccount.stlouisfed.org (free) |
 | `EIA_API_KEY` | Oil, gas, electricity prices | eia.gov/opendata (free) |
 
+## Graph Engine
+
+The graph uses **Cytoscape.js** with 4 layout algorithms:
+- **Force Network** (fCoSE) — physics-based force-directed
+- **Cola Physics** — constraint-based layout
+- **Concentric** — companies center, persons middle, articles outer ring
+- **Grid** — uniform spacing
+
+Nodes are color-coded by type (company=indigo, person=sky, article=orange, repo=green, event=purple). Click a node to open the detail panel with properties and connections.
+
+Filter panel toggles node types, link types, and edge labels.
+
 ## Design System
 
-The frontend uses the "Sovereign Intelligence" design language:
-- Dark mode with atmospheric surface layers
-- Space Grotesk + Inter typography
+"Sovereign Intelligence" — dark mode, editorial authority:
+- Deep atmospheric surfaces (`#020617` → `#0f172a` → `#1e293b`)
+- Space Grotesk (headlines) + Inter (body)
 - No borders — tonal depth separation
-- Color-coded entity types in graph visualization
+- Color-coded entity types across all views
 - Glassmorphism for floating elements
 
 ## License
