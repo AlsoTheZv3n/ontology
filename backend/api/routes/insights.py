@@ -319,3 +319,96 @@ async def markets(pool: asyncpg.Pool = Depends(get_pool)):
         "macro_indicators": [dict(r) for r in macro],
         "top_companies": [dict(r) for r in top_companies],
     }
+
+
+@router.get("/clusters")
+async def clusters(pool: asyncpg.Pool = Depends(get_pool)):
+    """Company clusters from K-Means clustering."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT key, properties->>'name' as name,
+                   properties->>'cluster_id' as cluster_id
+            FROM objects
+            WHERE type = 'company' AND properties->>'cluster_id' IS NOT NULL
+            ORDER BY (properties->>'cluster_id')::int, properties->>'name'
+            """
+        )
+    result: dict[str, list] = {}
+    for r in rows:
+        cid = r["cluster_id"] or "unknown"
+        result.setdefault(f"cluster_{cid}", []).append(
+            {"key": r["key"], "name": r["name"]}
+        )
+    return result
+
+
+@router.get("/sentiment/{company_key}")
+async def sentiment_trend(company_key: str, pool: asyncpg.Pool = Depends(get_pool)):
+    """Aggregated sentiment from articles mentioning a company."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT a.properties->>'title' as title,
+                   (a.properties->>'sentiment')::float as sentiment,
+                   a.properties->>'sentiment_label' as label,
+                   a.updated_at
+            FROM links l
+            JOIN objects a ON l.from_id = a.id AND a.type = 'article'
+            JOIN objects c ON l.to_id = c.id AND c.type = 'company'
+            WHERE c.key = $1 AND l.type = 'mentions'
+              AND a.properties->>'sentiment' IS NOT NULL
+            ORDER BY a.updated_at DESC
+            LIMIT 30
+            """,
+            company_key,
+        )
+    articles = [
+        {
+            "title": r["title"],
+            "sentiment": r["sentiment"],
+            "label": r["label"],
+            "date": r["updated_at"].isoformat() if r["updated_at"] else None,
+        }
+        for r in rows
+    ]
+    avg = sum(r["sentiment"] for r in rows) / len(rows) if rows else 0
+    return {
+        "company": company_key,
+        "avg_sentiment": round(avg, 3),
+        "article_count": len(articles),
+        "articles": articles,
+    }
+
+
+@router.get("/forecast/{company_key}/{metric}")
+async def forecast(
+    company_key: str,
+    metric: str,
+    periods: int = 4,
+    pool: asyncpg.Pool = Depends(get_pool),
+):
+    """Linear forecast for a company metric."""
+    from ml.analytics import forecast_linear
+
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT properties FROM objects WHERE type='company' AND key=$1",
+            company_key,
+        )
+    if not row:
+        return {"error": "Company not found"}
+
+    props = row["properties"] if isinstance(row["properties"], dict) else {}
+    value = props.get(metric)
+    if value is None:
+        return {"error": f"Metric '{metric}' not found"}
+
+    # Simple forecast from single value (linear extrapolation)
+    forecasts = forecast_linear([float(value)], periods=periods)
+    return {
+        "company": company_key,
+        "metric": metric,
+        "current": value,
+        "forecast": forecasts,
+    }

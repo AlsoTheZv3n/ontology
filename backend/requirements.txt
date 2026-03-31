@@ -24,6 +24,16 @@ boto3==1.34.0
 # Agent (Claude API)
 anthropic==0.42.0
 
+# ML (optional — graceful degradation if not installed)
+scikit-learn>=1.4.0
+numpy>=1.26.0
+# Heavy models (uncomment for full ML):
+# transformers>=4.40.0
+# torch>=2.2.0
+# sentence-transformers>=2.7.0
+# spacy>=3.7.0
+# prophet>=1.1.5
+
 # Testing
 pytest==8.3.0
 pytest-asyncio==0.24.0

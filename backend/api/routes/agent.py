@@ -284,6 +284,39 @@ TOOLS = [
             },
             "required": ["name"]
         }
+    },
+    {
+        "name": "get_sentiment_trend",
+        "description": (
+            "FinBERT-Sentiment-Trend für eine Company basierend auf Artikeln. "
+            "Gibt Durchschnitts-Sentiment und einzelne Artikel-Bewertungen zurück."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "company_key": {"type": "string", "description": "Company Key"}
+            },
+            "required": ["company_key"]
+        }
+    },
+    {
+        "name": "get_clusters",
+        "description": "Company-Cluster aus K-Means Clustering nach Finanz- und Tech-Profil.",
+        "input_schema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "detect_anomalies_metric",
+        "description": (
+            "Statistische Anomalie-Erkennung (Z-Score) für einen Metric über alle Companies. "
+            "Findet Ausreisser bei GitHub-Repos, Revenue, Market Cap etc."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "metric": {"type": "string", "description": "Property name: github_repos, revenue, market_cap, etc."}
+            },
+            "required": ["metric"]
+        }
     }
 ]
 
@@ -570,6 +603,55 @@ async def execute_tool(name: str, inputs: dict, reader: OntologyReader) -> dict:
             await redis_client.close()
         results["count"] = len(results["packages"])
         return results
+
+    elif name == "get_sentiment_trend":
+        company_key = inputs["company_key"]
+        async with reader.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT a.properties->>'title' as title,
+                       (a.properties->>'sentiment')::float as sentiment,
+                       a.properties->>'sentiment_label' as label
+                FROM links l
+                JOIN objects a ON l.from_id = a.id AND a.type = 'article'
+                JOIN objects c ON l.to_id = c.id AND c.type = 'company'
+                WHERE c.key = $1 AND l.type = 'mentions'
+                  AND a.properties->>'sentiment' IS NOT NULL
+                ORDER BY a.updated_at DESC LIMIT 20
+                """,
+                company_key,
+            )
+        articles = [{"title": r["title"], "sentiment": r["sentiment"], "label": r["label"]} for r in rows]
+        avg = sum(r["sentiment"] for r in rows) / len(rows) if rows else 0
+        return {"company": company_key, "avg_sentiment": round(avg, 3), "count": len(articles), "articles": articles[:10]}
+
+    elif name == "get_clusters":
+        async with reader.pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT key, properties->>'name' as name, properties->>'cluster_id' as cluster_id
+                FROM objects WHERE type='company' AND properties->>'cluster_id' IS NOT NULL
+                ORDER BY (properties->>'cluster_id')::int
+            """)
+        clusters: dict = {}
+        for r in rows:
+            clusters.setdefault(f"cluster_{r['cluster_id']}", []).append({"key": r["key"], "name": r["name"]})
+        return {"clusters": clusters, "count": len(rows)}
+
+    elif name == "detect_anomalies_metric":
+        from ml.analytics import detect_anomalies
+        metric = inputs["metric"]
+        async with reader.pool.acquire() as conn:
+            rows = await conn.fetch(f"""
+                SELECT key, properties->>'name' as name, (properties->>'{metric}')::float as val
+                FROM objects WHERE type='company' AND properties->>'{metric}' IS NOT NULL
+                ORDER BY key
+            """)
+        if not rows:
+            return {"error": f"No data for metric '{metric}'"}
+        values = [r["val"] for r in rows]
+        anomaly_indices = detect_anomalies(values)
+        anomalies = [{"key": rows[i]["key"], "name": rows[i]["name"], "value": rows[i]["val"]} for i in anomaly_indices]
+        return {"metric": metric, "anomalies": anomalies, "count": len(anomalies), "total_companies": len(rows)}
 
     return {"error": f"Unknown tool: {name}"}
 

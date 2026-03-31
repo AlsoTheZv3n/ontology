@@ -834,3 +834,101 @@ async def sync_semantic_scholar(ctx: dict) -> int:
             logger.exception("Semantic Scholar failed for %s", company_key)
 
     return count
+
+
+async def compute_sentiment(ctx: dict) -> int:
+    """Run FinBERT sentiment on articles without sentiment score."""
+    pool: asyncpg.Pool = ctx["pool"]
+    from ml.finbert import analyze_sentiment
+    import json as _json
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT key, properties->>'title' as title
+            FROM objects WHERE type = 'article' AND properties->>'sentiment' IS NULL
+            LIMIT 1000
+        """)
+
+    if not rows:
+        return 0
+
+    texts = [r["title"] or "" for r in rows]
+    results = analyze_sentiment(texts)
+
+    async with pool.acquire() as conn:
+        for row, result in zip(rows, results):
+            label = result["label"]
+            score = result["score"]
+            val = score if label == "positive" else -score if label == "negative" else 0.0
+            await conn.execute(
+                "UPDATE objects SET properties = properties || $1::jsonb WHERE key = $2",
+                _json.dumps({"sentiment": round(val, 3), "sentiment_label": label}),
+                row["key"],
+            )
+    return len(rows)
+
+
+async def compute_embeddings(ctx: dict) -> int:
+    """Generate semantic embeddings for objects without one."""
+    pool: asyncpg.Pool = ctx["pool"]
+    from ml.embeddings import embed_texts, embed_object
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT key, type, properties FROM objects
+            WHERE embedding IS NULL LIMIT 500
+        """)
+
+    if not rows:
+        return 0
+
+    texts = [embed_object(r["type"], r["properties"] if isinstance(r["properties"], dict) else {}) for r in rows]
+    valid = [(r, t) for r, t in zip(rows, texts) if t.strip()]
+    if not valid:
+        return 0
+
+    embeddings = embed_texts([t for _, t in valid])
+    if not embeddings:
+        return 0
+
+    async with pool.acquire() as conn:
+        for (row, _), emb in zip(valid, embeddings):
+            await conn.execute("UPDATE objects SET embedding = $1 WHERE key = $2", emb, row["key"])
+    return len(valid)
+
+
+async def compute_clusters(ctx: dict) -> int:
+    """Cluster companies by financial + tech profile using K-Means."""
+    pool: asyncpg.Pool = ctx["pool"]
+    from ml.analytics import cluster_companies
+    import json as _json
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT key,
+                COALESCE((properties->>'market_cap')::float, 0) as market_cap,
+                COALESCE((properties->>'revenue')::float, 0) as revenue,
+                COALESCE((properties->>'rd_expense')::float, 0) as rd_expense,
+                COALESCE((properties->>'github_repos')::float, 0) as github_repos,
+                COALESCE((properties->>'hf_model_count')::float, 0) as hf_models,
+                COALESCE((properties->>'employees')::float, 0) as employees
+            FROM objects WHERE type = 'company'
+        """)
+
+    if len(rows) < 5:
+        return 0
+
+    keys = [r["key"] for r in rows]
+    matrix = [[r["market_cap"], r["revenue"], r["rd_expense"],
+               r["github_repos"], r["hf_models"], r["employees"]] for r in rows]
+
+    clusters = cluster_companies(matrix, keys, n_clusters=min(5, len(keys) // 2))
+
+    async with pool.acquire() as conn:
+        for cluster_id, company_keys in clusters.items():
+            for key in company_keys:
+                await conn.execute(
+                    "UPDATE objects SET properties = properties || $1::jsonb WHERE key = $2",
+                    _json.dumps({"cluster_id": cluster_id}), key,
+                )
+    return len(keys)

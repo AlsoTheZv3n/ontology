@@ -10,7 +10,10 @@ from arq.connections import RedisSettings
 from config import settings
 from jobs.tasks import (
     build_competitor_links,
+    compute_clusters,
     compute_derived,
+    compute_embeddings,
+    compute_sentiment,
     extract_persons,
     resolve_entities,
     sync_eia,
@@ -67,6 +70,9 @@ class WorkerSettings:
         sync_countries,
         sync_world_bank_macro,
         sync_semantic_scholar,
+        compute_sentiment,
+        compute_embeddings,
+        compute_clusters,
     ]
     cron_jobs = [
         cron(sync_wikipedia, hour=2, minute=0),
@@ -86,6 +92,9 @@ class WorkerSettings:
         cron(sync_countries, weekday=0, hour=4),
         cron(sync_world_bank_macro, hour=5, minute=0),
         cron(sync_semantic_scholar, hour=3, minute=0),
+        cron(compute_sentiment, minute={5, 35}),
+        cron(compute_embeddings, hour={6, 12, 18, 0}),
+        cron(compute_clusters, hour=7, minute=0),
     ]
     on_startup = startup
     on_shutdown = shutdown

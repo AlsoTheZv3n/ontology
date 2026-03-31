@@ -13,6 +13,7 @@ VALID_SOURCES = [
     "wikipedia", "github", "yahoo_finance", "hn", "hn_algolia",
     "huggingface", "sec", "patents", "forbes", "fred", "eia",
     "wikidata", "sec_financials", "countries", "world_bank", "semantic_scholar",
+    "sentiment", "embeddings", "clusters",
     "persons", "competitors", "derived", "resolve",
 ]
 
@@ -33,6 +34,9 @@ TASK_MAP = {
     "countries": "sync_countries",
     "world_bank": "sync_world_bank_macro",
     "semantic_scholar": "sync_semantic_scholar",
+    "sentiment": "compute_sentiment",
+    "embeddings": "compute_embeddings",
+    "clusters": "compute_clusters",
     "persons": "extract_persons",
     "competitors": "build_competitor_links",
     "derived": "compute_derived",
