@@ -92,21 +92,21 @@ export function NodeDetailPanel({ nodeKey, nodeType, onClose, onNavigate }: Prop
             Connections ({(links as unknown[]).length})
           </p>
           <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
-            {(links as Array<Record<string, unknown>>).slice(0, 20).map((l, i) => {
-              const targetKey =
-                (l.from_key as string) === nodeKey
-                  ? (l.to_key as string)
-                  : (l.from_key as string);
+            {(links as Array<Record<string, unknown>>).slice(0, 30).map((l, i) => {
+              const isFrom = (l.from_key as string) === nodeKey;
+              const targetKey = isFrom ? (l.to_key as string) : (l.from_key as string);
+              const targetLabel = isFrom ? (l.to_label as string) : (l.from_label as string);
+              const targetType = isFrom ? (l.to_type as string) : (l.from_type as string);
               return (
                 <button
                   key={i}
                   onClick={() => onNavigate(targetKey)}
                   className="w-full flex items-center justify-between py-1.5 text-left hover:bg-surface-container-high/50 px-1 -mx-1 transition-colors"
                 >
-                  <div className="min-w-0">
-                    <p className="text-xs text-on-surface truncate">{targetKey}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-on-surface truncate">{targetLabel || targetKey}</p>
                     <p className="text-[9px] text-secondary uppercase tracking-widest">
-                      {l.type as string}
+                      {(l.type as string).replace(/_/g, " ")} · {targetType}
                     </p>
                   </div>
                   <span className="material-symbols-outlined text-xs text-secondary/30">

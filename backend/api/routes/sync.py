@@ -12,7 +12,7 @@ router = APIRouter()
 VALID_SOURCES = [
     "wikipedia", "github", "yahoo_finance", "hn", "hn_algolia",
     "huggingface", "sec", "patents", "forbes", "fred", "eia",
-    "wikidata", "sec_financials",
+    "wikidata", "sec_financials", "countries", "world_bank", "semantic_scholar",
     "persons", "competitors", "derived", "resolve",
 ]
 
@@ -30,6 +30,9 @@ TASK_MAP = {
     "eia": "sync_eia",
     "wikidata": "sync_wikidata",
     "sec_financials": "sync_sec_financials",
+    "countries": "sync_countries",
+    "world_bank": "sync_world_bank_macro",
+    "semantic_scholar": "sync_semantic_scholar",
     "persons": "extract_persons",
     "competitors": "build_competitor_links",
     "derived": "compute_derived",

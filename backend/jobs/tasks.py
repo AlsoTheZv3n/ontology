@@ -686,3 +686,151 @@ async def sync_sec_financials(ctx: dict) -> int:
             logger.exception("SEC XBRL failed for %s", row["key"])
 
     return count
+
+
+async def sync_countries(ctx: dict) -> int:
+    """Sync country data from REST Countries API — creates Country objects."""
+    pool: asyncpg.Pool = ctx["pool"]
+    redis_client: aioredis.Redis = ctx["redis"]
+    from connectors.countries import CountriesConnector
+    from schemas.objects import OntologyObject
+
+    conn = CountriesConnector(redis_client)
+    writer = OntologyWriter(pool)
+    data = await conn.fetch_all()
+    if not isinstance(data, list):
+        return 0
+
+    count = 0
+    for country in data:
+        name_data = country.get("name", {})
+        common_name = name_data.get("common", "") if isinstance(name_data, dict) else str(name_data)
+        code = country.get("cca2", "").lower()
+        if not code:
+            continue
+        obj = OntologyObject(
+            type="country",
+            key=code,
+            properties={
+                "name": common_name,
+                "iso2": country.get("cca2"),
+                "iso3": country.get("cca3"),
+                "capital": country.get("capital", [None])[0] if isinstance(country.get("capital"), list) else None,
+                "region": country.get("region"),
+                "subregion": country.get("subregion"),
+                "population": country.get("population"),
+                "area": country.get("area"),
+                "borders": country.get("borders", []),
+            },
+            sources={"countries": country},
+        )
+        await writer.upsert(obj)
+        count += 1
+
+    # Create borders_with links
+    async with pool.acquire() as db:
+        countries_db = await db.fetch("SELECT id, key, properties FROM objects WHERE type='country'")
+    key_to_id = {r["key"]: str(r["id"]) for r in countries_db}
+    for r in countries_db:
+        props = r["properties"] if isinstance(r["properties"], dict) else {}
+        for border_code in (props.get("borders") or []):
+            neighbor = border_code.lower()[:2]
+            if neighbor in key_to_id and r["key"] < neighbor:
+                await writer.upsert_link("borders_with", str(r["id"]), key_to_id[neighbor])
+
+    return count
+
+
+async def sync_world_bank_macro(ctx: dict) -> int:
+    """Sync World Bank macro indicators for key countries."""
+    pool: asyncpg.Pool = ctx["pool"]
+    redis_client: aioredis.Redis = ctx["redis"]
+    from connectors.world_bank import WorldBankConnector
+    from schemas.objects import OntologyObject
+
+    conn = WorldBankConnector(redis_client)
+    writer = OntologyWriter(pool)
+    all_data = await conn.fetch_all_macro()
+    count = 0
+
+    for country_code, indicators in all_data.items():
+        for indicator_name, raw_data in indicators.items():
+            if not raw_data:
+                continue
+            # World Bank returns [metadata, [data_points]] or just data
+            if isinstance(raw_data, list) and len(raw_data) >= 2 and isinstance(raw_data[1], list):
+                data_points = [
+                    {"year": int(p.get("date", 0)), "value": p.get("value")}
+                    for p in raw_data[1]
+                    if p.get("value") is not None
+                ]
+            elif isinstance(raw_data, list):
+                data_points = raw_data
+            else:
+                continue
+            if not data_points:
+                continue
+            data_points.sort(key=lambda x: x.get("year", 0))
+            latest = data_points[-1] if data_points else {}
+            key = f"macro-{country_code.lower()}-{indicator_name}"
+            obj = OntologyObject(
+                type="macro_indicator",
+                key=key,
+                properties={
+                    "name": f"{indicator_name} ({country_code})",
+                    "country": country_code,
+                    "indicator": indicator_name,
+                    "latest_value": latest.get("value"),
+                    "latest_year": latest.get("year"),
+                    "time_series": data_points[-10:],
+                },
+                sources={"world_bank": {"indicator": indicator_name, "country": country_code}},
+            )
+            await writer.upsert(obj)
+            count += 1
+
+    return count
+
+
+async def sync_semantic_scholar(ctx: dict) -> int:
+    """Sync research papers for seeded companies from Semantic Scholar."""
+    pool: asyncpg.Pool = ctx["pool"]
+    redis_client: aioredis.Redis = ctx["redis"]
+    from connectors.semantic_scholar import SemanticScholarConnector
+    from schemas.objects import OntologyObject
+    import asyncio
+
+    conn = SemanticScholarConnector(redis_client)
+    writer = OntologyWriter(pool)
+    count = 0
+
+    AI_COMPANIES = ["anthropic", "openai", "google", "meta", "microsoft", "nvidia", "ibm", "apple"]
+    for company_key in AI_COMPANIES:
+        try:
+            data = await conn.search_papers(company_key, limit=10)
+            papers = data.get("data", [])
+            for paper in papers:
+                paper_id = paper.get("paperId", "")[:12]
+                if not paper_id:
+                    continue
+                obj = OntologyObject(
+                    type="paper",
+                    key=f"paper-{paper_id}",
+                    properties={
+                        "title": paper.get("title"),
+                        "year": paper.get("year"),
+                        "citations": paper.get("citationCount"),
+                        "abstract": (paper.get("abstract") or "")[:300],
+                    },
+                    sources={"semantic_scholar": paper},
+                )
+                paper_obj_id = await writer.upsert(obj)
+                company_id = await writer.get_id("company", company_key)
+                if company_id:
+                    await writer.upsert_link("publishes_research", company_id, paper_obj_id)
+                count += 1
+            await asyncio.sleep(1)  # rate limit
+        except Exception:
+            logger.exception("Semantic Scholar failed for %s", company_key)
+
+    return count

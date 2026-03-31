@@ -22,9 +22,12 @@ from jobs.tasks import (
     sync_huggingface,
     sync_patents,
     sync_sec,
+    sync_countries,
     sync_sec_financials,
+    sync_semantic_scholar,
     sync_wikidata,
     sync_wikipedia,
+    sync_world_bank_macro,
     sync_yahoo_finance,
 )
 
@@ -61,6 +64,9 @@ class WorkerSettings:
         build_competitor_links,
         sync_wikidata,
         sync_sec_financials,
+        sync_countries,
+        sync_world_bank_macro,
+        sync_semantic_scholar,
     ]
     cron_jobs = [
         cron(sync_wikipedia, hour=2, minute=0),
@@ -77,6 +83,9 @@ class WorkerSettings:
         cron(build_competitor_links, hour=4, minute=30),
         cron(sync_wikidata, hour=1, minute=0),
         cron(sync_sec_financials, weekday=1, hour=3, minute=30),
+        cron(sync_countries, weekday=0, hour=4),
+        cron(sync_world_bank_macro, hour=5, minute=0),
+        cron(sync_semantic_scholar, hour=3, minute=0),
     ]
     on_startup = startup
     on_shutdown = shutdown

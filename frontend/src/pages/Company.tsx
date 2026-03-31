@@ -2,14 +2,25 @@ import { useParams, Link } from "react-router-dom";
 import { useObject, useObjectLinks, useTimeline } from "@/hooks/useOntology";
 import { SourceBadge } from "@/components/SourceBadge";
 
+const YEAR_FIELDS = new Set(["founded", "sic"]);
+
+function formatValue(key: string, value: unknown): string {
+  if (YEAR_FIELDS.has(key) && typeof value === "number") {
+    return String(Math.round(value));
+  }
+  if (typeof value === "number") {
+    if (value > 1e12) return `$${(value / 1e12).toFixed(2)}T`;
+    if (value > 1e9) return `$${(value / 1e9).toFixed(1)}B`;
+    if (value > 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+    return value.toLocaleString("en-US");
+  }
+  if (Array.isArray(value)) return value.join(", ");
+  return String(value);
+}
+
 function PropertyRow({ label, value }: { label: string; value: unknown }) {
   if (value == null || value === "") return null;
-  const display =
-    typeof value === "number"
-      ? value.toLocaleString()
-      : Array.isArray(value)
-        ? value.join(", ")
-        : String(value);
+  const display = formatValue(label, value);
 
   return (
     <div className="flex items-center justify-between py-3">
