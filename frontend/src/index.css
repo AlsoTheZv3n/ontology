@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 20;
+  font-size: 20px;
+}
+
+.technical-grid {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(51, 65, 85, 0.2) 1px,
+    transparent 0
+  );
+  background-size: 40px 40px;
+}
