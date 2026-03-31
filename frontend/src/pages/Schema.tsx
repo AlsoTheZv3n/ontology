@@ -4,7 +4,7 @@ interface SchemaData {
   object_types: { type: string; count: number }[];
   link_types: {
     from_type: string;
-    link_type: string;
+    type: string;
     to_type: string;
     count: number;
   }[];
@@ -145,7 +145,7 @@ export function Schema() {
                   <tbody>
                     {data.link_types.map((lt, i) => (
                       <tr
-                        key={`${lt.from_type}-${lt.link_type}-${lt.to_type}-${i}`}
+                        key={`${lt.from_type}-${lt.type}-${lt.to_type}-${i}`}
                         className="border-b border-outline/50 hover:bg-surface-container-high/30 transition-colors"
                       >
                         <td className="px-4 py-3">
@@ -154,7 +154,7 @@ export function Schema() {
                         <td className="px-4 py-3 text-center">
                           <span className="text-secondary mx-2">-</span>
                           <span className="text-xs text-on-surface font-label font-bold uppercase tracking-widest">
-                            {lt.link_type.replace("_", " ")}
+                            {lt.type.replace("_", " ")}
                           </span>
                           <span className="text-secondary mx-2">-</span>
                         </td>

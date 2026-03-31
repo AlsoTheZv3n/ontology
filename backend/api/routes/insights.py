@@ -321,6 +321,64 @@ async def markets(pool: asyncpg.Pool = Depends(get_pool)):
     }
 
 
+@router.get("/alerts")
+async def alerts(pool: asyncpg.Pool = Depends(get_pool)):
+    """Generate live alerts from Z-score anomaly detection on company metrics."""
+    from ml.analytics import detect_anomalies
+    import numpy as np
+
+    METRICS = [
+        ("github_repos", "GitHub Activity", "GitHub"),
+        ("hf_model_count", "HuggingFace Models", "HuggingFace"),
+        ("revenue", "Revenue Outlier", "SEC XBRL"),
+        ("market_cap", "Market Cap Anomaly", "Alpha Vantage"),
+        ("rd_expense", "R&D Spending Anomaly", "SEC XBRL"),
+    ]
+
+    all_alerts = []
+
+    async with pool.acquire() as conn:
+        for metric, label, source in METRICS:
+            rows = await conn.fetch(f"""
+                SELECT key, properties->>'name' as name,
+                       (properties->>'{metric}')::float as val
+                FROM objects WHERE type='company' AND properties->>'{metric}' IS NOT NULL
+                ORDER BY key
+            """)
+            if len(rows) < 5:
+                continue
+
+            values = [r["val"] for r in rows]
+            mean = np.mean(values)
+            std = np.std(values)
+            if std == 0:
+                continue
+
+            anomaly_indices = detect_anomalies(values, sensitivity=1.8)
+            for idx in anomaly_indices:
+                r = rows[idx]
+                z = abs((r["val"] - mean) / std)
+                severity = "high" if z > 3 else "medium" if z > 2.5 else "low"
+                val_fmt = f"${r['val']/1e9:.1f}B" if r["val"] > 1e9 else f"{r['val']:,.0f}"
+                avg_fmt = f"${mean/1e9:.1f}B" if mean > 1e9 else f"{mean:,.0f}"
+                all_alerts.append({
+                    "id": f"alert-{metric}-{r['key']}",
+                    "title": f"{r['name'] or r['key']} — {label}",
+                    "description": f"{metric.replace('_',' ').title()} value {val_fmt} is {z:.1f}σ from mean ({avg_fmt}). Statistical outlier detected across {len(rows)} companies.",
+                    "severity": severity,
+                    "source": source,
+                    "company_key": r["key"],
+                    "metric": metric,
+                    "value": r["val"],
+                    "z_score": round(z, 2),
+                })
+
+    # Sort by severity then z_score
+    sev_order = {"high": 0, "medium": 1, "low": 2}
+    all_alerts.sort(key=lambda a: (sev_order.get(a["severity"], 3), -a["z_score"]))
+    return all_alerts[:20]
+
+
 @router.get("/clusters")
 async def clusters(pool: asyncpg.Pool = Depends(get_pool)):
     """Company clusters from K-Means clustering."""
