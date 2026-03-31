@@ -616,3 +616,73 @@ async def resolve_entities(ctx: dict) -> int:
                 count += 1
 
     return count
+
+
+async def extract_persons(ctx: dict) -> int:
+    """Extract Person objects from existing Company CEO properties and Patent inventors."""
+    pool = ctx["pool"]
+    from transform.person_extractor import extract_ceos, extract_patent_inventors
+    ceos = await extract_ceos(pool)
+    inventors = await extract_patent_inventors(pool)
+    return ceos + inventors
+
+
+async def build_competitor_links(ctx: dict) -> int:
+    """Create competitor_of links between companies in the same sector."""
+    pool = ctx["pool"]
+    from transform.competitor_resolver import resolve_competitors
+    return await resolve_competitors(pool)
+
+
+
+async def sync_wikidata(ctx: dict) -> int:
+    """Sync company data from Wikidata SPARQL — CEOs, founders, HQ, employees."""
+    pool: asyncpg.Pool = ctx["pool"]
+    redis_client: aioredis.Redis = ctx["redis"]
+
+    from connectors.wikidata import WikidataConnector
+    conn = WikidataConnector(redis_client)
+    mapper = CompanyMapper()
+    writer = OntologyWriter(pool)
+
+    all_data = await conn.fetch_all_companies()
+    count = 0
+    for company_key, data in all_data.items():
+        if not data:
+            continue
+        obj = mapper.from_wikidata(company_key, data)
+        await writer.upsert(obj)
+        count += 1
+
+    return count
+
+
+async def sync_sec_financials(ctx: dict) -> int:
+    """Sync SEC XBRL financial statements — Revenue, Net Income, Assets, R&D."""
+    pool: asyncpg.Pool = ctx["pool"]
+    redis_client: aioredis.Redis = ctx["redis"]
+
+    from connectors.sec_edgar import SECEdgarConnector
+    conn = SECEdgarConnector(redis_client)
+    mapper = CompanyMapper()
+    writer = OntologyWriter(pool)
+
+    async with pool.acquire() as db:
+        rows = await db.fetch("""
+            SELECT key, properties->>'cik' as cik
+            FROM objects WHERE type = 'company' AND properties->>'cik' IS NOT NULL
+        """)
+
+    count = 0
+    for row in rows:
+        try:
+            data = await conn.fetch_financials(row["cik"])
+            if not data:
+                continue
+            obj = mapper.from_sec_financials(row["key"], data)
+            await writer.upsert(obj)
+            count += 1
+        except Exception:
+            logger.exception("SEC XBRL failed for %s", row["key"])
+
+    return count

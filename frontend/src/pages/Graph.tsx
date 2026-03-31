@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useGraph, useObjects } from "@/hooks/useOntology";
 import { GraphView } from "@/components/GraphView";
 import { GraphFilterPanel, defaultFilters } from "@/components/GraphFilterPanel";
+import { NodeDetailPanel } from "@/components/NodeDetailPanel";
 import { api } from "@/lib/api";
 
 export function Graph() {
@@ -13,6 +14,7 @@ export function Graph() {
   const [depth, setDepth] = useState(2);
 
   const [filters, setFilters] = useState(defaultFilters);
+  const [selectedNode, setSelectedNode] = useState<{ key: string; type: string } | null>(null);
   const { data, isLoading, error } = useGraph(activeRoot, depth);
   const { data: companies } = useObjects({ type: "company" });
 
@@ -208,19 +210,30 @@ export function Graph() {
       )}
 
       {data && !isLoading && (
-        <div className="flex gap-4">
+        <div className="flex gap-0">
           <GraphFilterPanel
             filters={filters}
             setFilters={setFilters}
             stats={graphStats}
           />
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <GraphView
               data={data}
               filters={filters}
-              onNodeClick={(key) => selectCompany(key)}
+              onNodeClick={(key, type) => setSelectedNode({ key, type })}
             />
           </div>
+          {selectedNode && (
+            <NodeDetailPanel
+              nodeKey={selectedNode.key}
+              nodeType={selectedNode.type}
+              onClose={() => setSelectedNode(null)}
+              onNavigate={(key) => {
+                selectCompany(key);
+                setSelectedNode(null);
+              }}
+            />
+          )}
         </div>
       )}
 

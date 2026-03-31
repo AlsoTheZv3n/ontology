@@ -89,6 +89,31 @@ class CompanyMapper:
             sources={"sec_edgar": raw},
         )
 
+    @staticmethod
+    def from_wikidata(key: str, data: dict) -> CompanyObject:
+        """Map Wikidata SPARQL response to CompanyObject."""
+        props: dict = {}
+        if ceo := data.get("ceo"):
+            props["ceo"] = ceo
+        if founders := data.get("founders"):
+            props["founder"] = founders[0] if len(founders) == 1 else ", ".join(founders)
+        if founded := data.get("founded"):
+            props["founded"] = founded
+        if hq := data.get("hq"):
+            props["hq"] = hq
+        if employees := data.get("employees"):
+            props["employees"] = employees
+        return CompanyObject(key=key, properties=props, sources={"wikidata": data})
+
+    @staticmethod
+    def from_sec_financials(key: str, data: dict) -> CompanyObject:
+        """Map SEC XBRL financial facts to CompanyObject."""
+        props: dict = {}
+        for field in ["revenue", "net_income", "total_assets", "cash", "rd_expense", "eps"]:
+            if val := data.get(field):
+                props[field] = val
+        return CompanyObject(key=key, properties=props, sources={"sec_xbrl": data})
+
     def _extract_ceo(self, raw: dict) -> str | None:
         for officer in raw.get("companyOfficers", []):
             if "CEO" in officer.get("title", ""):

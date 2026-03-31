@@ -9,7 +9,9 @@ from arq.connections import RedisSettings
 
 from config import settings
 from jobs.tasks import (
+    build_competitor_links,
     compute_derived,
+    extract_persons,
     resolve_entities,
     sync_eia,
     sync_forbes,
@@ -20,6 +22,8 @@ from jobs.tasks import (
     sync_huggingface,
     sync_patents,
     sync_sec,
+    sync_sec_financials,
+    sync_wikidata,
     sync_wikipedia,
     sync_yahoo_finance,
 )
@@ -53,6 +57,10 @@ class WorkerSettings:
         sync_eia,
         compute_derived,
         resolve_entities,
+        extract_persons,
+        build_competitor_links,
+        sync_wikidata,
+        sync_sec_financials,
     ]
     cron_jobs = [
         cron(sync_wikipedia, hour=2, minute=0),
@@ -65,6 +73,10 @@ class WorkerSettings:
         cron(sync_fred, hour={6, 12, 18, 0}),
         cron(sync_eia, hour={6, 18}),
         cron(compute_derived, hour={6, 12, 18}),
+        cron(extract_persons, hour=4, minute=0),
+        cron(build_competitor_links, hour=4, minute=30),
+        cron(sync_wikidata, hour=1, minute=0),
+        cron(sync_sec_financials, weekday=1, hour=3, minute=30),
     ]
     on_startup = startup
     on_shutdown = shutdown

@@ -11,7 +11,9 @@ router = APIRouter()
 
 VALID_SOURCES = [
     "wikipedia", "github", "yahoo_finance", "hn", "hn_algolia",
-    "huggingface", "sec", "patents", "forbes", "fred", "eia", "derived", "resolve",
+    "huggingface", "sec", "patents", "forbes", "fred", "eia",
+    "wikidata", "sec_financials",
+    "persons", "competitors", "derived", "resolve",
 ]
 
 TASK_MAP = {
@@ -26,6 +28,10 @@ TASK_MAP = {
     "forbes": "sync_forbes",
     "fred": "sync_fred",
     "eia": "sync_eia",
+    "wikidata": "sync_wikidata",
+    "sec_financials": "sync_sec_financials",
+    "persons": "extract_persons",
+    "competitors": "build_competitor_links",
     "derived": "compute_derived",
     "resolve": "resolve_entities",
 }

@@ -1,149 +1,93 @@
-import { useCallback, useMemo } from "react";
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  Node,
-  Edge,
-  Handle,
-  Position,
-} from "reactflow";
-import "reactflow/dist/style.css";
-import dagre from "@dagrejs/dagre";
+import { useEffect, useRef, useMemo } from "react";
+import cytoscape, { Core, NodeSingular } from "cytoscape";
+import cola from "cytoscape-cola";
+import fcose from "cytoscape-fcose";
 import type { GraphResponse } from "@/lib/api";
 import type { GraphFilters } from "./GraphFilterPanel";
 
-// ── Colors & config ──
+cytoscape.use(cola);
+cytoscape.use(fcose);
 
-const TYPE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  company:    { bg: "#1e293b", border: "#6366f1", text: "#a5b4fc" },
-  person:     { bg: "#1e293b", border: "#0ea5e9", text: "#7dd3fc" },
-  article:    { bg: "#1e293b", border: "#f97316", text: "#fdba74" },
-  repository: { bg: "#1e293b", border: "#10b981", text: "#6ee7b7" },
-  event:      { bg: "#1e293b", border: "#a855f7", text: "#c4b5fd" },
+// ── Node styles per type ──
+
+const NODE_STYLES: Record<string, { bg: string; border: string; shape: string }> = {
+  company:    { bg: "#1e1b4b", border: "#818cf8", shape: "roundrectangle" },
+  person:     { bg: "#0c1a2e", border: "#38bdf8", shape: "ellipse" },
+  article:    { bg: "#1c1917", border: "#fb923c", shape: "rectangle" },
+  repository: { bg: "#052e16", border: "#4ade80", shape: "roundrectangle" },
+  event:      { bg: "#2d1b69", border: "#a78bfa", shape: "diamond" },
 };
 
-const TYPE_ICONS: Record<string, string> = {
-  company: "domain",
-  person: "person",
-  article: "article",
-  repository: "code",
-  event: "event",
+const EDGE_COLORS: Record<string, string> = {
+  mentions:       "#fb923c",
+  owns_repo:      "#4ade80",
+  filed:          "#a78bfa",
+  is_ceo_of:      "#38bdf8",
+  contributed_to: "#34d399",
+  competitor_of:  "#ef4444",
+  invented:       "#f472b6",
+  in_sector:      "#94a3b8",
 };
 
-const DEFAULT_COLOR = { bg: "#1e293b", border: "#334155", text: "#94a3b8" };
+// ── Layouts ──
 
-// ── Custom Node ──
+const LAYOUTS: Record<string, object> = {
+  force: {
+    name: "fcose",
+    quality: "default",
+    randomize: true,
+    animate: true,
+    animationDuration: 600,
+    nodeRepulsion: 8000,
+    idealEdgeLength: 120,
+    edgeElasticity: 0.45,
+    numIter: 2500,
+    fit: true,
+    padding: 40,
+  },
+  cola: {
+    name: "cola",
+    animate: true,
+    animationDuration: 600,
+    maxSimulationTime: 2000,
+    fit: true,
+    padding: 40,
+    nodeSpacing: 50,
+    edgeLength: 150,
+  },
+  concentric: {
+    name: "concentric",
+    fit: true,
+    padding: 40,
+    minNodeSpacing: 40,
+    concentric: (node: NodeSingular) => {
+      const t = node.data("nodeType");
+      return t === "company" ? 3 : t === "person" ? 2 : 1;
+    },
+    levelWidth: () => 2,
+  },
+  grid: {
+    name: "grid",
+    fit: true,
+    padding: 40,
+    avoidOverlap: true,
+  },
+};
 
-function OntologyNode({ data }: { data: { label: string; type: string } }) {
-  const color = TYPE_COLORS[data.type] ?? DEFAULT_COLOR;
-  return (
-    <div
-      style={{
-        background: color.bg,
-        border: `2px solid ${color.border}`,
-        borderRadius: "4px",
-        padding: "6px 14px",
-        minWidth: 80,
-        maxWidth: 200,
-      }}
-    >
-      <Handle type="target" position={Position.Left} style={{ background: color.border, width: 6, height: 6 }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span
-          className="material-symbols-outlined"
-          style={{ fontSize: 14, color: color.border }}
-        >
-          {TYPE_ICONS[data.type] ?? "category"}
-        </span>
-        <div>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "#f8fafc",
-              fontFamily: "Space Grotesk, sans-serif",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              maxWidth: 150,
-            }}
-          >
-            {data.label}
-          </div>
-          <div
-            style={{
-              fontSize: 8,
-              color: color.text,
-              fontFamily: "Space Grotesk, sans-serif",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            {data.type}
-          </div>
-        </div>
-      </div>
-      <Handle type="source" position={Position.Right} style={{ background: color.border, width: 6, height: 6 }} />
-    </div>
-  );
-}
-
-const nodeTypes = { ontology: OntologyNode };
-
-// ── Layout functions ──
-
-function layoutDagre(
-  nodes: Node[],
-  edges: Edge[],
-  direction: "LR" | "TB"
-): Node[] {
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: direction, nodesep: 60, ranksep: 120 });
-
-  nodes.forEach((n) => g.setNode(n.id, { width: 180, height: 50 }));
-  edges.forEach((e) => g.setEdge(e.source, e.target));
-
-  dagre.layout(g);
-
-  return nodes.map((n) => {
-    const pos = g.node(n.id);
-    return { ...n, position: { x: pos.x - 90, y: pos.y - 25 } };
-  });
-}
-
-function layoutRadial(nodes: Node[]): Node[] {
-  if (nodes.length === 0) return nodes;
-  const cx = 400, cy = 400;
-  return nodes.map((n, i) => {
-    if (i === 0) return { ...n, position: { x: cx, y: cy } };
-    const angle = ((i - 1) / (nodes.length - 1)) * 2 * Math.PI;
-    const radius = 250 + Math.floor(i / 12) * 150;
-    return {
-      ...n,
-      position: {
-        x: cx + Math.cos(angle) * radius,
-        y: cy + Math.sin(angle) * radius,
-      },
-    };
-  });
-}
-
-// ── Main Component ──
+// ── Component ──
 
 interface GraphViewProps {
   data: GraphResponse;
   filters: GraphFilters;
-  onNodeClick?: (key: string) => void;
+  onNodeClick?: (key: string, type: string) => void;
 }
 
 export function GraphView({ data, filters, onNodeClick }: GraphViewProps) {
-  // Filter nodes and edges
-  const filtered = useMemo(() => {
-    const visibleNodes = data.nodes.filter((n) =>
-      filters.nodeTypes.has(n.type)
-    );
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cyRef = useRef<Core | null>(null);
+
+  const elements = useMemo(() => {
+    const visibleNodes = data.nodes.filter((n) => filters.nodeTypes.has(n.type));
     const visibleIds = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = data.edges.filter(
       (e) =>
@@ -151,88 +95,153 @@ export function GraphView({ data, filters, onNodeClick }: GraphViewProps) {
         visibleIds.has(e.source) &&
         visibleIds.has(e.target)
     );
-    return { nodes: visibleNodes, edges: visibleEdges };
-  }, [data, filters.nodeTypes, filters.linkTypes]);
 
-  // Build React Flow nodes
-  const rawNodes: Node[] = useMemo(
-    () =>
-      filtered.nodes.map((n) => ({
-        id: n.id,
-        type: "ontology",
-        position: { x: 0, y: 0 },
+    const connectedIds = new Set<string>();
+    visibleEdges.forEach((e) => {
+      connectedIds.add(e.source);
+      connectedIds.add(e.target);
+    });
+
+    const nodes = visibleNodes
+      .filter((n) => n.type === "company" || n.type === "person" || connectedIds.has(n.id))
+      .map((n) => ({
         data: {
-          label: (n.data.label as string) ?? n.id,
-          type: n.type,
+          id: n.id,
+          label: ((n.data.label as string) ?? n.id).slice(0, 35),
+          nodeType: n.type,
         },
-      })),
-    [filtered.nodes]
-  );
+      }));
 
-  // Build React Flow edges
-  const flowEdges: Edge[] = useMemo(
-    () =>
-      filtered.edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        label: filters.showLabels ? e.label.replace(/_/g, " ") : undefined,
-        animated: false,
-        style: { stroke: "#334155", strokeWidth: 1.5 },
-        labelStyle: {
-          fill: "#64748b",
-          fontSize: 9,
-          fontFamily: "Space Grotesk",
+    const nodeIds = new Set(nodes.map((n) => n.data.id));
+    const edges = visibleEdges
+      .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+      .map((e) => ({
+        data: {
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          linkType: e.label,
+          label: filters.showLabels ? e.label.replace(/_/g, " ") : "",
         },
-        labelBgStyle: { fill: "#020617", fillOpacity: 0.9 },
-      })),
-    [filtered.edges, filters.showLabels]
-  );
+      }));
 
-  // Apply layout
-  const layoutNodes = useMemo(() => {
-    if (rawNodes.length === 0) return rawNodes;
-    if (filters.layout === "dagre-lr") return layoutDagre(rawNodes, flowEdges, "LR");
-    if (filters.layout === "dagre-tb") return layoutDagre(rawNodes, flowEdges, "TB");
-    return layoutRadial(rawNodes);
-  }, [rawNodes, flowEdges, filters.layout]);
+    return [...nodes, ...edges];
+  }, [data, filters.nodeTypes, filters.linkTypes, filters.showLabels]);
 
-  const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      onNodeClick?.(node.id);
-    },
-    [onNodeClick]
-  );
+  const layoutKey = useMemo(() => {
+    const map: Record<string, string> = {
+      "dagre-lr": "cola",
+      "dagre-tb": "concentric",
+      "radial": "force",
+      force: "force",
+      cola: "cola",
+      concentric: "concentric",
+      grid: "grid",
+    };
+    return map[filters.layout] ?? "force";
+  }, [filters.layout]);
+
+  useEffect(() => {
+    if (!containerRef.current || elements.length === 0) return;
+
+    const cy = cytoscape({
+      container: containerRef.current,
+      elements,
+      style: [
+        {
+          selector: "node",
+          style: {
+            "background-color": "#1e293b",
+            "border-width": 2,
+            "border-color": "#475569",
+            label: "data(label)",
+            color: "#f8fafc",
+            "font-size": 11,
+            "font-family": "Space Grotesk, sans-serif",
+            "text-valign": "center",
+            "text-halign": "center",
+            "text-wrap": "ellipsis",
+            "text-max-width": "120px",
+            padding: "8px",
+            "min-zoomed-font-size": 8,
+          },
+        },
+        ...Object.entries(NODE_STYLES).map(([type, s]) => ({
+          selector: `node[nodeType="${type}"]`,
+          style: {
+            "background-color": s.bg,
+            "border-color": s.border,
+            shape: s.shape as any,
+            width: type === "company" ? 65 : type === "person" ? 50 : 40,
+            height: type === "company" ? 65 : type === "person" ? 50 : 40,
+          },
+        })),
+        {
+          selector: "node[nodeType='company']",
+          style: { "font-size": 13, "font-weight": "bold" as any },
+        },
+        {
+          selector: "node:selected",
+          style: { "border-width": 4, "border-color": "#ffffff" },
+        },
+        {
+          selector: "edge",
+          style: {
+            width: 1.5,
+            "line-color": "#334155",
+            "target-arrow-color": "#334155",
+            "target-arrow-shape": "triangle",
+            "curve-style": "bezier",
+            "arrow-scale": 0.8,
+            label: "data(label)",
+            "font-size": 9,
+            color: "#64748b",
+            "text-rotation": "autorotate" as any,
+            "text-margin-y": -8,
+            "font-family": "Space Grotesk, sans-serif",
+            "min-zoomed-font-size": 10,
+          },
+        },
+        ...Object.entries(EDGE_COLORS).map(([type, color]) => ({
+          selector: `edge[linkType="${type}"]`,
+          style: { "line-color": color, "target-arrow-color": color },
+        })),
+        {
+          selector: ".highlighted",
+          style: { "border-color": "#ffffff", "border-width": 3, opacity: 1 },
+        },
+        {
+          selector: ".faded",
+          style: { opacity: 0.12 },
+        },
+      ],
+    });
+
+    cy.layout(LAYOUTS[layoutKey] as any).run();
+
+    cy.on("tap", "node", (evt) => {
+      const node = evt.target;
+      onNodeClick?.(node.id(), node.data("nodeType"));
+      cy.elements().addClass("faded");
+      node.removeClass("faded").addClass("highlighted");
+      node.neighborhood().removeClass("faded").addClass("highlighted");
+    });
+
+    cy.on("tap", (evt) => {
+      if (evt.target === cy) {
+        cy.elements().removeClass("faded highlighted");
+      }
+    });
+
+    cyRef.current = cy;
+    return () => cy.destroy();
+  }, [elements, layoutKey, onNodeClick]);
 
   return (
-    <div className="w-full h-[600px] bg-surface border border-outline">
-      <ReactFlow
-        nodes={layoutNodes}
-        edges={flowEdges}
-        onNodeClick={handleNodeClick}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        proOptions={{ hideAttribution: true }}
-        minZoom={0.1}
-        maxZoom={2}
-      >
-        <Background color="#1e293b" gap={40} size={1} />
-        <Controls
-          style={{
-            background: "#0f172a",
-            border: "1px solid #334155",
-            borderRadius: "4px",
-          }}
-        />
-        <MiniMap
-          style={{ background: "#0f172a", border: "1px solid #334155" }}
-          nodeColor={(n) => (TYPE_COLORS[n.data?.type as string] ?? DEFAULT_COLOR).border}
-          maskColor="rgba(2, 6, 23, 0.8)"
-        />
-      </ReactFlow>
-    </div>
+    <div
+      ref={containerRef}
+      className="w-full bg-surface border border-outline"
+      style={{ height: 640 }}
+    />
   );
 }

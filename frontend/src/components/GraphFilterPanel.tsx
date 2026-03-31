@@ -3,12 +3,12 @@ import { Dispatch, SetStateAction } from "react";
 export interface GraphFilters {
   nodeTypes: Set<string>;
   linkTypes: Set<string>;
-  layout: "dagre-lr" | "dagre-tb" | "radial";
+  layout: "force" | "cola" | "concentric" | "grid";
   showLabels: boolean;
 }
 
 export const ALL_NODE_TYPES = ["company", "article", "repository", "event", "person"];
-export const ALL_LINK_TYPES = ["mentions", "owns_repo", "filed", "is_ceo_of", "contributed_to", "competitor_of"];
+export const ALL_LINK_TYPES = ["mentions", "owns_repo", "filed", "is_ceo_of", "invented", "contributed_to", "competitor_of"];
 
 const NODE_COLORS: Record<string, string> = {
   company: "bg-blue-500",
@@ -164,9 +164,10 @@ export function GraphFilterPanel({ filters, setFilters, stats }: Props) {
         </p>
         <div className="space-y-1">
           {[
-            { key: "dagre-lr" as const, label: "Horizontal", icon: "arrow_forward" },
-            { key: "dagre-tb" as const, label: "Vertical", icon: "arrow_downward" },
-            { key: "radial" as const, label: "Radial", icon: "blur_circular" },
+            { key: "force" as const, label: "Force Network", icon: "hub" },
+            { key: "cola" as const, label: "Cola Physics", icon: "scatter_plot" },
+            { key: "concentric" as const, label: "Concentric", icon: "blur_circular" },
+            { key: "grid" as const, label: "Grid", icon: "grid_on" },
           ].map((opt) => (
             <button
               key={opt.key}
@@ -222,7 +223,7 @@ export function defaultFilters(): GraphFilters {
   return {
     nodeTypes: new Set(ALL_NODE_TYPES),
     linkTypes: new Set(ALL_LINK_TYPES),
-    layout: "dagre-lr",
+    layout: "force",
     showLabels: true,
   };
 }
