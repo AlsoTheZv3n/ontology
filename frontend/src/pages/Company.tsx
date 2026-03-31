@@ -2,18 +2,34 @@ import { useParams, Link } from "react-router-dom";
 import { useObject, useObjectLinks, useTimeline } from "@/hooks/useOntology";
 import { SourceBadge } from "@/components/SourceBadge";
 
-const YEAR_FIELDS = new Set(["founded", "sic"]);
+const YEAR_FIELDS = new Set(["founded", "sic", "rank", "cluster_id"]);
+const COUNT_FIELDS = new Set([
+  "github_repos", "github_followers", "hf_model_count",
+  "hf_total_likes", "hf_total_downloads", "employees",
+]);
+const MONEY_FIELDS = new Set([
+  "market_cap", "revenue", "net_income", "total_assets",
+  "cash", "rd_expense", "analyst_target",
+]);
 
 function formatValue(key: string, value: unknown): string {
-  if (YEAR_FIELDS.has(key) && typeof value === "number") {
-    return String(Math.round(value));
+  if (value == null) return "";
+  const num = typeof value === "number" ? value : Number(value);
+
+  if (YEAR_FIELDS.has(key) && !isNaN(num))
+    return String(Math.round(num));
+
+  if (COUNT_FIELDS.has(key) && !isNaN(num))
+    return num.toLocaleString("en-US");
+
+  if (MONEY_FIELDS.has(key) && !isNaN(num)) {
+    if (num > 1e12) return `$${(num / 1e12).toFixed(2)}T`;
+    if (num > 1e9) return `$${(num / 1e9).toFixed(1)}B`;
+    if (num > 1e6) return `$${(num / 1e6).toFixed(1)}M`;
+    return `$${num.toLocaleString("en-US")}`;
   }
-  if (typeof value === "number") {
-    if (value > 1e12) return `$${(value / 1e12).toFixed(2)}T`;
-    if (value > 1e9) return `$${(value / 1e9).toFixed(1)}B`;
-    if (value > 1e6) return `$${(value / 1e6).toFixed(1)}M`;
-    return value.toLocaleString("en-US");
-  }
+
+  if (typeof value === "number") return value.toLocaleString("en-US");
   if (Array.isArray(value)) return value.join(", ");
   return String(value);
 }
@@ -140,38 +156,55 @@ export function Company() {
           )}
         </section>
 
-        {/* Links sidebar */}
-        <aside className="col-span-12 lg:col-span-4">
-          <div className="bg-surface-container/50 backdrop-blur-sm border border-outline p-8">
-            <h3 className="text-[10px] uppercase tracking-[0.3em] font-bold text-primary mb-6">
-              Connections ({links?.length ?? 0})
+        {/* Links sidebar — grouped by type */}
+        <aside className="col-span-12 lg:col-span-4 space-y-6">
+          <div className="bg-surface-container/50 backdrop-blur-sm border border-outline p-6">
+            <h3 className="text-[10px] uppercase tracking-[0.3em] font-bold text-primary mb-4">
+              Connections ({(links as unknown[])?.length ?? 0})
             </h3>
-            {links && links.length > 0 ? (
-              <div className="space-y-3">
-                {(links as Array<Record<string, unknown>>).map(
-                  (link, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between py-2"
-                    >
-                      <div>
-                        <p className="text-xs font-bold text-on-surface">
-                          {(link.to_key as string) ?? (link.from_key as string)}
-                        </p>
-                        <p className="text-[9px] text-secondary uppercase tracking-widest">
-                          {link.type as string}
-                        </p>
-                      </div>
-                      <Link
-                        to={`/graph/${(link.to_key as string) ?? ""}`}
-                        className="material-symbols-outlined text-sm text-secondary hover:text-primary transition-colors"
-                      >
-                        arrow_forward
-                      </Link>
+            {links && (links as unknown[]).length > 0 ? (
+              (() => {
+                const grouped: Record<string, Array<Record<string, unknown>>> = {};
+                for (const l of links as Array<Record<string, unknown>>) {
+                  const t = (l.type as string) || "unknown";
+                  (grouped[t] ??= []).push(l);
+                }
+                return Object.entries(grouped).map(([linkType, items]) => (
+                  <div key={linkType} className="mb-5">
+                    <p className="text-[9px] text-secondary uppercase tracking-widest font-label mb-2">
+                      {linkType.replace(/_/g, " ")} ({items.length})
+                    </p>
+                    <div className="space-y-1">
+                      {items.slice(0, 15).map((link, i) => {
+                        const isSource = (link.from_key as string) === key;
+                        const targetKey = isSource ? (link.to_key as string) : (link.from_key as string);
+                        const targetLabel = isSource ? (link.to_label as string) : (link.from_label as string);
+                        const targetType = isSource ? (link.to_type as string) : (link.from_type as string);
+                        const route = targetType === "company" ? `/company/${targetKey}` : `/graph/${targetKey}`;
+                        return (
+                          <Link
+                            key={i}
+                            to={route}
+                            className="flex items-center justify-between py-1.5 px-2 -mx-2 hover:bg-surface-container-high/30 transition-colors"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-on-surface truncate">
+                                {targetLabel || targetKey}
+                              </p>
+                            </div>
+                            <span className="material-symbols-outlined text-xs text-secondary/30 ml-2">
+                              arrow_forward
+                            </span>
+                          </Link>
+                        );
+                      })}
+                      {items.length > 15 && (
+                        <p className="text-[9px] text-secondary/50 pl-2">+{items.length - 15} more</p>
+                      )}
                     </div>
-                  )
-                )}
-              </div>
+                  </div>
+                ));
+              })()
             ) : (
               <p className="text-xs text-secondary">No connections yet.</p>
             )}

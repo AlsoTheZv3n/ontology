@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # New connector API keys
     alpha_vantage_key: str = ""
+    finnhub_api_key: str = ""
     fred_api_key: str = ""
     eia_api_key: str = ""
 
