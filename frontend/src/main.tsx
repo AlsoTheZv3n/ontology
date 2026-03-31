@@ -9,6 +9,11 @@ import { Graph } from "./pages/Graph";
 import { Company } from "./pages/Company";
 import { Search } from "./pages/Search";
 import { Chat } from "./pages/Chat";
+import { Feed } from "./pages/Feed";
+import { Markets } from "./pages/Markets";
+import { Entities } from "./pages/Entities";
+import { Schema } from "./pages/Schema";
+import { Alerts } from "./pages/Alerts";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +38,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/company/:key" element={<Company />} />
             <Route path="/search" element={<Search />} />
             <Route path="/chat" element={<Chat />} />
+            <Route path="/feed" element={<Feed />} />
+            <Route path="/markets" element={<Markets />} />
+            <Route path="/entities" element={<Entities />} />
+            <Route path="/schema" element={<Schema />} />
+            <Route path="/alerts" element={<Alerts />} />
           </Route>
         </Routes>
       </BrowserRouter>

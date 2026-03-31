@@ -176,3 +176,146 @@ async def stats(pool: asyncpg.Pool = Depends(get_pool)):
         "total_snapshots": snapshot_count,
         "source_coverage": {r["source"]: r["count"] for r in source_counts},
     }
+
+
+@router.get("/feed")
+async def feed(limit: int = 30, pool: asyncpg.Pool = Depends(get_pool)):
+    """Recent events stream — filings, articles, anomalies sorted by time."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT key, type,
+                   properties->>'name' as name,
+                   properties->>'title' as title,
+                   properties->>'event_type' as event_type,
+                   properties->>'form' as form,
+                   properties->>'date' as event_date,
+                   properties->>'source' as source,
+                   updated_at
+            FROM objects
+            WHERE type IN ('event', 'article')
+            ORDER BY updated_at DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+    return [
+        {
+            "key": r["key"],
+            "type": r["type"],
+            "label": r["title"] or r["name"] or (f"{r['form']} — {r['event_date']}" if r["form"] else r["key"]),
+            "event_type": r["event_type"] or r["source"] or r["type"],
+            "date": r["event_date"],
+            "updated": r["updated_at"].isoformat() if r["updated_at"] else None,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/schema")
+async def schema(pool: asyncpg.Pool = Depends(get_pool)):
+    """Ontology schema — link types with counts and from/to types."""
+    async with pool.acquire() as conn:
+        link_stats = await conn.fetch(
+            """
+            SELECT l.type as link_type,
+                   o_from.type as from_type,
+                   o_to.type as to_type,
+                   count(*) as count
+            FROM links l
+            JOIN objects o_from ON l.from_id = o_from.id
+            JOIN objects o_to ON l.to_id = o_to.id
+            GROUP BY l.type, o_from.type, o_to.type
+            ORDER BY count DESC
+            """
+        )
+        type_counts = await conn.fetch(
+            "SELECT type, count(*) as count FROM objects GROUP BY type ORDER BY count DESC"
+        )
+    return {
+        "link_types": [
+            {
+                "type": r["link_type"],
+                "from_type": r["from_type"],
+                "to_type": r["to_type"],
+                "count": r["count"],
+            }
+            for r in link_stats
+        ],
+        "object_types": [
+            {"type": r["type"], "count": r["count"]}
+            for r in type_counts
+        ],
+    }
+
+
+@router.get("/entities")
+async def entities(
+    type: str = "company",
+    limit: int = 50,
+    offset: int = 0,
+    pool: asyncpg.Pool = Depends(get_pool),
+):
+    """Browse entities by type with key properties."""
+    async with pool.acquire() as conn:
+        total = await conn.fetchval(
+            "SELECT count(*) FROM objects WHERE type = $1", type
+        )
+        rows = await conn.fetch(
+            """
+            SELECT key, properties->>'name' as name, sources, updated_at
+            FROM objects
+            WHERE type = $1
+            ORDER BY properties->>'name' NULLS LAST, key
+            LIMIT $2 OFFSET $3
+            """,
+            type, limit, offset,
+        )
+    return {
+        "type": type,
+        "total": total,
+        "items": [
+            {
+                "key": r["key"],
+                "name": r["name"] or r["key"],
+                "sources": list(r["sources"].keys()) if isinstance(r["sources"], dict) else [],
+                "updated": r["updated_at"].isoformat() if r["updated_at"] else None,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/markets")
+async def markets(pool: asyncpg.Pool = Depends(get_pool)):
+    """Macro indicators and commodity-related data."""
+    async with pool.acquire() as conn:
+        macro = await conn.fetch(
+            """
+            SELECT key, properties->>'name' as name,
+                   properties->>'indicator' as indicator,
+                   properties->>'country' as country,
+                   properties->>'latest_value' as value,
+                   properties->>'latest_year' as year
+            FROM objects
+            WHERE type = 'macro_indicator'
+            ORDER BY properties->>'country', properties->>'indicator'
+            """
+        )
+        top_companies = await conn.fetch(
+            """
+            SELECT key, properties->>'name' as name,
+                   properties->>'market_cap' as market_cap,
+                   properties->>'revenue' as revenue,
+                   properties->>'net_income' as net_income,
+                   properties->>'sector' as sector
+            FROM objects
+            WHERE type = 'company' AND properties->>'market_cap' IS NOT NULL
+            ORDER BY (properties->>'market_cap')::float DESC NULLS LAST
+            LIMIT 15
+            """
+        )
+    return {
+        "macro_indicators": [dict(r) for r in macro],
+        "top_companies": [dict(r) for r in top_companies],
+    }

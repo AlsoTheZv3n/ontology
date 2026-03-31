@@ -1,10 +1,18 @@
 import { NavLink, Outlet } from "react-router-dom";
 
-const NAV_ITEMS = [
+const NAV_CORE = [
   { to: "/", icon: "dashboard", label: "Dashboard" },
+  { to: "/feed", icon: "rss_feed", label: "Feed" },
   { to: "/graph", icon: "workspaces", label: "Graph" },
   { to: "/search", icon: "search", label: "Search" },
   { to: "/chat", icon: "smart_toy", label: "Agent" },
+];
+
+const NAV_DATA = [
+  { to: "/markets", icon: "candlestick_chart", label: "Markets" },
+  { to: "/entities", icon: "category", label: "Entities" },
+  { to: "/schema", icon: "schema", label: "Schema" },
+  { to: "/alerts", icon: "notifications_active", label: "Alerts" },
 ];
 
 export function Layout() {
@@ -30,24 +38,50 @@ export function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 px-3 space-y-1">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 font-label font-medium text-xs uppercase tracking-widest transition-all group ${
-                  isActive
-                    ? "bg-surface-container-high text-primary translate-x-1"
-                    : "text-secondary hover:bg-surface-container-high/50 hover:text-on-surface"
-                }`
-              }
-            >
-              <span className="material-symbols-outlined">{item.icon}</span>
-              {item.label}
-            </NavLink>
-          ))}
+        <nav className="flex-1 px-3 overflow-y-auto">
+          <div className="space-y-0.5">
+            {NAV_CORE.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-2.5 font-label font-medium text-xs uppercase tracking-widest transition-all ${
+                    isActive
+                      ? "bg-surface-container-high text-primary translate-x-1"
+                      : "text-secondary hover:bg-surface-container-high/50 hover:text-on-surface"
+                  }`
+                }
+              >
+                <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+
+          <div className="mt-4 mb-1 px-4">
+            <span className="text-[9px] text-secondary/40 uppercase tracking-[0.2em] font-label">
+              Data
+            </span>
+          </div>
+          <div className="space-y-0.5">
+            {NAV_DATA.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-2.5 font-label font-medium text-xs uppercase tracking-widest transition-all ${
+                    isActive
+                      ? "bg-surface-container-high text-primary translate-x-1"
+                      : "text-secondary hover:bg-surface-container-high/50 hover:text-on-surface"
+                  }`
+                }
+              >
+                <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
         </nav>
 
         <div className="p-3 space-y-1">

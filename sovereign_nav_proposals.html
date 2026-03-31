@@ -1,0 +1,296 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Space Grotesk', 'DM Mono', monospace; }
+  .wrap { display: flex; min-height: 540px; background: #070c14; border-radius: 10px; overflow: hidden; border: 1px solid #1a2332; }
+  .sidebar { width: 180px; flex-shrink: 0; background: #0a1120; border-right: 1px solid #1a2332; padding: 16px 0; }
+  .logo { padding: 0 16px 20px; border-bottom: 1px solid #1a2332; margin-bottom: 8px; }
+  .logo-icon { width: 28px; height: 28px; background: #1d4ed8; border-radius: 6px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+  .logo-title { font-size: 12px; font-weight: 700; color: #f1f5f9; letter-spacing: 0.05em; }
+  .logo-sub { font-size: 9px; color: #475569; letter-spacing: 0.15em; text-transform: uppercase; }
+  .nav-label { font-size: 9px; color: #334155; letter-spacing: 0.2em; text-transform: uppercase; padding: 12px 16px 4px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 8px 16px; cursor: pointer; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; transition: all 0.15s; border-left: 2px solid transparent; }
+  .nav-item:hover { color: #94a3b8; background: #0f1929; }
+  .nav-item.active { color: #60a5fa; border-left-color: #3b82f6; background: #0f1929; }
+  .nav-item.new-tag { color: #64748b; }
+  .nav-item .badge { font-size: 8px; background: #1d4ed8; color: #bfdbfe; padding: 2px 5px; border-radius: 3px; letter-spacing: 0.1em; margin-left: auto; }
+  .nav-icon { width: 14px; height: 14px; opacity: 0.7; flex-shrink: 0; }
+  .main { flex: 1; overflow: hidden; }
+  .preview { display: none; flex-direction: column; height: 100%; padding: 20px; }
+  .preview.active { display: flex; }
+  .preview-header { margin-bottom: 16px; }
+  .preview-tag { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: #3b82f6; font-weight: 700; margin-bottom: 4px; }
+  .preview-title { font-size: 22px; font-weight: 800; color: #f1f5f9; letter-spacing: -0.02em; }
+  .preview-desc { font-size: 12px; color: #475569; margin-top: 4px; line-height: 1.5; }
+  .why { background: #0f1929; border: 1px solid #1e3a5f; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; }
+  .why-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.2em; color: #3b82f6; font-weight: 700; margin-bottom: 4px; }
+  .why-text { font-size: 11px; color: #7ea8d8; line-height: 1.6; }
+  .cards-grid { display: grid; gap: 10px; flex: 1; }
+  .card { background: #0f1929; border: 1px solid #1a2332; border-radius: 6px; padding: 12px; }
+  .card-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.2em; color: #475569; font-weight: 700; margin-bottom: 6px; }
+  .card-content { font-size: 11px; color: #64748b; line-height: 1.5; }
+  .mini-feed { display: flex; flex-direction: column; gap: 6px; }
+  .feed-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid #1a2332; }
+  .feed-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .feed-dot.pos { background: #22c55e; }
+  .feed-dot.neg { background: #ef4444; }
+  .feed-dot.neu { background: #60a5fa; }
+  .feed-dot.warn { background: #f59e0b; }
+  .feed-text { font-size: 11px; color: #64748b; }
+  .feed-text strong { color: #94a3b8; font-weight: 600; }
+  .feed-time { font-size: 9px; color: #334155; margin-top: 1px; }
+  .market-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #1a2332; }
+  .market-name { font-size: 11px; color: #94a3b8; font-weight: 600; }
+  .market-price { font-size: 11px; color: #f1f5f9; font-weight: 700; }
+  .market-chg { font-size: 10px; font-weight: 600; }
+  .market-chg.pos { color: #22c55e; }
+  .market-chg.neg { color: #ef4444; }
+  .entity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .entity-type { background: #070c14; border: 1px solid #1a2332; border-radius: 5px; padding: 8px 10px; }
+  .entity-type-name { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 2px; }
+  .entity-type-count { font-size: 18px; font-weight: 800; color: #f1f5f9; }
+  .entity-type-sub { font-size: 9px; color: #475569; margin-top: 1px; }
+  .relation-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid #1a2332; font-size: 10px; }
+  .rel-from { color: #60a5fa; font-weight: 600; }
+  .rel-arrow { color: #334155; }
+  .rel-type { color: #f59e0b; font-family: monospace; font-size: 9px; background: #1a1500; border: 1px solid #2a2000; border-radius: 3px; padding: 1px 5px; }
+  .rel-to { color: #34d399; font-weight: 600; }
+  .alert-item { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 1px solid #1a2332; }
+  .alert-sev { width: 3px; border-radius: 2px; align-self: stretch; min-height: 32px; flex-shrink: 0; }
+  .alert-sev.high { background: #ef4444; }
+  .alert-sev.med { background: #f59e0b; }
+  .alert-sev.low { background: #60a5fa; }
+  .alert-title { font-size: 11px; color: #94a3b8; font-weight: 600; }
+  .alert-desc { font-size: 10px; color: #475569; margin-top: 2px; line-height: 1.4; }
+  .alert-meta { font-size: 9px; color: #334155; margin-top: 2px; }
+  .version { font-size: 9px; color: #1e3a5f; text-align: center; padding: 12px 0 4px; letter-spacing: 0.1em; }
+</style>
+
+<div class="wrap">
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="3" fill="white" opacity="0.9"/><circle cx="7" cy="7" r="6" stroke="white" stroke-width="1" opacity="0.4"/></svg>
+      </div>
+      <div class="logo-title">Sovereign</div>
+      <div class="logo-sub">Intelligence Engine</div>
+    </div>
+
+    <div class="nav-label">Core</div>
+    <div class="nav-item" onclick="show('dashboard',this)">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="currentColor"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="show('graph',this)">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="7" r="1.5"/><circle cx="2" cy="4" r="1.5"/><circle cx="12" cy="4" r="1.5"/><circle cx="2" cy="10" r="1.5"/><circle cx="12" cy="10" r="1.5"/><line x1="7" y1="7" x2="2" y2="4" stroke="currentColor" stroke-width="0.8"/><line x1="7" y1="7" x2="12" y2="4" stroke="currentColor" stroke-width="0.8"/><line x1="7" y1="7" x2="2" y2="10" stroke="currentColor" stroke-width="0.8"/><line x1="7" y1="7" x2="12" y2="10" stroke="currentColor" stroke-width="0.8"/></svg>
+      Graph
+    </div>
+    <div class="nav-item" onclick="show('search',this)">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4"/><line x1="9" y1="9" x2="13" y2="13"/></svg>
+      Search
+    </div>
+    <div class="nav-item" onclick="show('agent',this)">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="4" width="10" height="7" rx="1.5" opacity="0.6"/><circle cx="5" cy="7.5" r="1"/><circle cx="9" cy="7.5" r="1"/><rect x="5" y="1" width="4" height="3" rx="1"/></svg>
+      Agent
+    </div>
+
+    <div class="nav-label" style="margin-top:8px">New Pages</div>
+
+    <div class="nav-item active" onclick="show('feed',this)">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="currentColor"><rect x="1" y="3" width="12" height="1.5" rx="0.75"/><rect x="1" y="6.5" width="9" height="1.5" rx="0.75"/><rect x="1" y="10" width="11" height="1.5" rx="0.75"/></svg>
+      Feed
+      <span class="badge">NEW</span>
+    </div>
+    <div class="nav-item" onclick="show('markets',this)">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="currentColor"><rect x="1" y="9" width="2" height="4" rx="0.5"/><rect x="4.5" y="6" width="2" height="7" rx="0.5"/><rect x="8" y="3" width="2" height="10" rx="0.5"/><rect x="11.5" y="7" width="2" height="6" rx="0.5"/></svg>
+      Markets
+      <span class="badge">NEW</span>
+    </div>
+    <div class="nav-item" onclick="show('entities',this)">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="currentColor"><circle cx="4" cy="4" r="2.5"/><circle cx="10" cy="10" r="2.5"/><rect x="8.5" y="3" width="5" height="2" rx="1" opacity="0.5"/><rect x="0.5" y="9" width="5" height="2" rx="1" opacity="0.5"/></svg>
+      Entities
+      <span class="badge">NEW</span>
+    </div>
+    <div class="nav-item" onclick="show('relations',this)">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 7 Q7 2 12 7 Q7 12 2 7"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>
+      Schema
+      <span class="badge">NEW</span>
+    </div>
+    <div class="nav-item" onclick="show('alerts',this)">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="currentColor"><path d="M7 1 L9 5 L13 5.5 L10 8.5 L10.5 13 L7 11 L3.5 13 L4 8.5 L1 5.5 L5 5 Z" opacity="0.8"/></svg>
+      Alerts
+      <span class="badge">NEW</span>
+    </div>
+
+    <div class="version">V1.0.0</div>
+  </div>
+
+  <div class="main">
+
+    <!-- FEED -->
+    <div class="preview active" id="prev-feed">
+      <div class="preview-header">
+        <div class="preview-tag">Proposed Page</div>
+        <div class="preview-title">Intelligence Feed</div>
+        <div class="preview-desc">Live stream of events, sentiment shifts, anomalies and news — chronological, filterable by type.</div>
+      </div>
+      <div class="why">
+        <div class="why-label">Why this page</div>
+        <div class="why-text">Dashboard zeigt Snapshots. Der Feed zeigt was gerade passiert — Sentiment-Änderungen, neue Artikel, SEC Filings, Anomalien — alles in einem Stream. Wichtig sobald ML-Sentiment läuft.</div>
+      </div>
+      <div class="cards-grid" style="grid-template-columns:1fr 1fr">
+        <div class="card">
+          <div class="card-label">Live Events</div>
+          <div class="mini-feed">
+            <div class="feed-item"><div class="feed-dot neg"></div><div><div class="feed-text"><strong>NVIDIA</strong> — Sentiment drop: +0.82 → +0.31</div><div class="feed-time">2 min ago · FinBERT</div></div></div>
+            <div class="feed-item"><div class="feed-dot pos"></div><div><div class="feed-text"><strong>Anthropic</strong> — 3 neue HN-Artikel, avg +0.71</div><div class="feed-time">8 min ago · HN Algolia</div></div></div>
+            <div class="feed-item"><div class="feed-dot neu"></div><div><div class="feed-text"><strong>Apple</strong> — SEC Filing: 10-Q eingereicht</div><div class="feed-time">14 min ago · SEC EDGAR</div></div></div>
+            <div class="feed-item"><div class="feed-dot warn"></div><div><div class="feed-text"><strong>Lithium</strong> — Preis +4.2% gegenüber gestern</div><div class="feed-time">32 min ago · Commodities</div></div></div>
+            <div class="feed-item"><div class="feed-dot pos"></div><div><div class="feed-text"><strong>Stripe</strong> — CEO Patrick Collison erwähnt in 7 Artikeln</div><div class="feed-time">1h ago · NER</div></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">Filter by Type</div>
+          <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+            <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#60a5fa"><div style="width:6px;height:6px;background:#60a5fa;border-radius:50%"></div>Filings</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#22c55e"><div style="width:6px;height:6px;background:#22c55e;border-radius:50%"></div>Positive Sentiment</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#ef4444"><div style="width:6px;height:6px;background:#ef4444;border-radius:50%"></div>Negative Sentiment</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#f59e0b"><div style="width:6px;height:6px;background:#f59e0b;border-radius:50%"></div>Price Anomalies</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#a78bfa"><div style="width:6px;height:6px;background:#a78bfa;border-radius:50%"></div>Person Mentions</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#34d399"><div style="width:6px;height:6px;background:#34d399;border-radius:50%"></div>New Connections</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MARKETS -->
+    <div class="preview" id="prev-markets">
+      <div class="preview-header">
+        <div class="preview-tag">Proposed Page</div>
+        <div class="preview-title">Markets</div>
+        <div class="preview-desc">Rohstoffe, Makro-Indikatoren und Company-Finanzdaten in einem Dashboard.</div>
+      </div>
+      <div class="why">
+        <div class="why-label">Why this page</div>
+        <div class="why-text">Öl, Lithium, Gold, Zinsen — das sind die Kräfte die hinter den Companies stehen. Diese Seite verbindet Makro mit Mikro: Tesla fällt wenn Lithium steigt, NVIDIA wenn Energiepreise steigen.</div>
+      </div>
+      <div class="cards-grid" style="grid-template-columns:1fr 1fr">
+        <div class="card">
+          <div class="card-label">Commodities</div>
+          <div class="market-row"><span class="market-name">Gold (XAU)</span><span class="market-price">$3,128</span><span class="market-chg pos">+0.8%</span></div>
+          <div class="market-row"><span class="market-name">Oil WTI</span><span class="market-price">$71.40</span><span class="market-chg neg">-1.2%</span></div>
+          <div class="market-row"><span class="market-name">Lithium</span><span class="market-price">$14,200</span><span class="market-chg pos">+4.2%</span></div>
+          <div class="market-row"><span class="market-name">Cobalt</span><span class="market-price">$26,800</span><span class="market-chg neg">-0.4%</span></div>
+          <div class="market-row"><span class="market-name">Copper</span><span class="market-price">$9,840</span><span class="market-chg pos">+1.1%</span></div>
+        </div>
+        <div class="card">
+          <div class="card-label">Macro Indicators</div>
+          <div class="market-row"><span class="market-name">Fed Funds Rate</span><span class="market-price">4.50%</span><span class="market-chg neu" style="color:#60a5fa">—</span></div>
+          <div class="market-row"><span class="market-name">US GDP Growth</span><span class="market-price">2.3%</span><span class="market-chg pos">+0.2pp</span></div>
+          <div class="market-row"><span class="market-name">US Inflation</span><span class="market-price">3.1%</span><span class="market-chg neg">+0.1pp</span></div>
+          <div class="market-row"><span class="market-name">Unemployment</span><span class="market-price">3.7%</span><span class="market-chg pos">-0.1pp</span></div>
+          <div class="market-row"><span class="market-name">10Y Treasury</span><span class="market-price">4.28%</span><span class="market-chg neg">+0.05pp</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENTITIES -->
+    <div class="preview" id="prev-entities">
+      <div class="preview-header">
+        <div class="preview-tag">Proposed Page</div>
+        <div class="preview-title">Entities</div>
+        <div class="preview-desc">Browse alle Objekt-Typen in der Ontology — Companies, Persons, Countries, Commodities, Papers.</div>
+      </div>
+      <div class="why">
+        <div class="why-label">Why this page</div>
+        <div class="why-text">Persons und Countries existieren bald als eigene Entitäten. Die Suche findet einzelne Objekte, aber diese Seite zeigt den vollständigen Überblick — wie viele Entities welchen Typs, welche am reichsten befüllt sind.</div>
+      </div>
+      <div class="entity-grid" style="margin-bottom:12px">
+        <div class="entity-type"><div class="entity-type-name" style="color:#6366f1">Companies</div><div class="entity-type-count">53</div><div class="entity-type-sub">6 sources avg</div></div>
+        <div class="entity-type"><div class="entity-type-name" style="color:#38bdf8">Persons</div><div class="entity-type-count">48</div><div class="entity-type-sub">CEOs + Founders</div></div>
+        <div class="entity-type"><div class="entity-type-name" style="color:#4ade80">Repositories</div><div class="entity-type-count">580</div><div class="entity-type-sub">GitHub</div></div>
+        <div class="entity-type"><div class="entity-type-name" style="color:#fb923c">Articles</div><div class="entity-type-count">1851</div><div class="entity-type-sub">HN + News</div></div>
+        <div class="entity-type"><div class="entity-type-name" style="color:#a78bfa">Events</div><div class="entity-type-count">370</div><div class="entity-type-sub">SEC Filings</div></div>
+        <div class="entity-type"><div class="entity-type-name" style="color:#f59e0b">Countries</div><div class="entity-type-count">12</div><div class="entity-type-sub">World Bank</div></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Filter & Browse</div>
+        <div class="card-content">Klickbare Typ-Filter → zeigt alle Objekte in einer Tabelle mit Key Properties, Quellen-Coverage und direktem Link zum Graph.</div>
+      </div>
+    </div>
+
+    <!-- RELATIONS / SCHEMA -->
+    <div class="preview" id="prev-relations">
+      <div class="preview-header">
+        <div class="preview-tag">Proposed Page</div>
+        <div class="preview-title">Ontology Schema</div>
+        <div class="preview-desc">Alle definierten Link-Types, welche Objekt-Typen sie verbinden, und wie viele aktive Verbindungen es gibt.</div>
+      </div>
+      <div class="why">
+        <div class="why-label">Why this page</div>
+        <div class="why-text">Macht die Ontology selbst sichtbar und erklärbar. Für Portfolio-Präsentationen zeigt diese Seite sofort dass es sich um ein echtes Knowledge-Graph-System handelt — nicht nur eine Datenbank.</div>
+      </div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-label">Active Link Types</div>
+        <div class="relation-row"><span class="rel-from">Company</span><span class="rel-arrow">——</span><span class="rel-type">mentions</span><span class="rel-arrow">——▶</span><span class="rel-to">Article</span><span style="margin-left:auto;font-size:9px;color:#475569">1900</span></div>
+        <div class="relation-row"><span class="rel-from">Company</span><span class="rel-arrow">——</span><span class="rel-type">owns_repo</span><span class="rel-arrow">——▶</span><span class="rel-to">Repository</span><span style="margin-left:auto;font-size:9px;color:#475569">580</span></div>
+        <div class="relation-row"><span class="rel-from">Person</span><span class="rel-arrow">——</span><span class="rel-type">is_ceo_of</span><span class="rel-arrow">——▶</span><span class="rel-to">Company</span><span style="margin-left:auto;font-size:9px;color:#475569">48</span></div>
+        <div class="relation-row"><span class="rel-from">Company</span><span class="rel-arrow">——</span><span class="rel-type">competitor_of</span><span class="rel-arrow">——▶</span><span class="rel-to">Company</span><span style="margin-left:auto;font-size:9px;color:#475569">262</span></div>
+        <div class="relation-row"><span class="rel-from">Company</span><span class="rel-arrow">——</span><span class="rel-type">filed</span><span class="rel-arrow">——▶</span><span class="rel-to">Event</span><span style="margin-left:auto;font-size:9px;color:#475569">370</span></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Planned (nach Upgrade)</div>
+        <div class="relation-row" style="opacity:0.5"><span class="rel-from">Company</span><span class="rel-arrow">——</span><span class="rel-type">depends_on</span><span class="rel-arrow">——▶</span><span class="rel-to">Commodity</span></div>
+        <div class="relation-row" style="opacity:0.5"><span class="rel-from">Person</span><span class="rel-arrow">——</span><span class="rel-type">authored</span><span class="rel-arrow">——▶</span><span class="rel-to">Paper</span></div>
+        <div class="relation-row" style="opacity:0.5"><span class="rel-from">Company</span><span class="rel-arrow">——</span><span class="rel-type">headquartered_in</span><span class="rel-arrow">——▶</span><span class="rel-to">Country</span></div>
+      </div>
+    </div>
+
+    <!-- ALERTS -->
+    <div class="preview" id="prev-alerts">
+      <div class="preview-header">
+        <div class="preview-tag">Proposed Page</div>
+        <div class="preview-title">Alerts</div>
+        <div class="preview-desc">ML-getriebene Anomalie-Erkennungen, Sentiment-Ausreisser und watchlist-basierte Benachrichtigungen.</div>
+      </div>
+      <div class="why">
+        <div class="why-label">Why this page</div>
+        <div class="why-text">Macht den ML-Layer direkt sichtbar. Wenn FinBERT und scikit-learn Anomalien finden, müssen diese irgendwo erscheinen. Diese Seite ist der Beweis dass das System aktiv denkt — nicht nur Daten speichert.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Active Alerts</div>
+        <div class="alert-item"><div class="alert-sev high"></div><div><div class="alert-title">NVIDIA — Sentiment Anomaly</div><div class="alert-desc">Sentiment fiel von +0.82 auf +0.31 in 6h. 12 Artikel mit negativem Ton zu "AI chip export restrictions".</div><div class="alert-meta">FinBERT · 2 min ago · HIGH</div></div></div>
+        <div class="alert-item"><div class="alert-sev med"></div><div><div class="alert-title">Lithium — Price Spike +4.2%</div><div class="alert-desc">Betrifft Tesla, Apple, NVIDIA (depends_on Lithium). Histor. Anomalie: 2.1σ über 30-Tage-Durchschnitt.</div><div class="alert-meta">Commodities · 32 min ago · MED</div></div></div>
+        <div class="alert-item"><div class="alert-sev low"></div><div><div class="alert-title">Anthropic — GitHub Activity +340%</div><div class="alert-desc">Ungewöhnlich viele neue Repos in der letzten Woche. K-Means Cluster-Shift erkannt.</div><div class="alert-meta">GitHub · 1h ago · LOW</div></div></div>
+      </div>
+    </div>
+
+    <!-- Existing pages placeholders -->
+    <div class="preview" id="prev-dashboard">
+      <div class="preview-header"><div class="preview-tag">Existing</div><div class="preview-title">Dashboard</div><div class="preview-desc">Bereits implementiert — KPIs, Market Cap Chart, Trending, Source Coverage.</div></div>
+      <div class="why"><div class="why-label">Status</div><div class="why-text">Vollständig implementiert. Kann nach ML-Integration um Sentiment-Chart und Cluster-Widget erweitert werden.</div></div>
+    </div>
+    <div class="preview" id="prev-graph">
+      <div class="preview-header"><div class="preview-tag">Existing</div><div class="preview-title">Graph</div><div class="preview-desc">Bereits implementiert — Cytoscape Upgrade geplant per sovereign_ontology_upgrade.md.</div></div>
+      <div class="why"><div class="why-label">Status</div><div class="why-text">Läuft mit React Flow + Dagre. Nach Cytoscape-Migration: force-directed Layout für echte Netzwerke.</div></div>
+    </div>
+    <div class="preview" id="prev-search">
+      <div class="preview-header"><div class="preview-tag">Existing</div><div class="preview-title">Search</div><div class="preview-desc">Bereits implementiert — Relevance Ranking, Autocomplete. Erweiterbar mit semantischer Suche.</div></div>
+      <div class="why"><div class="why-label">Status</div><div class="why-text">Nach Embeddings: GET /search/similar/{key} hinzufügen → "Zeig mir Companies ähnlich wie Anthropic".</div></div>
+    </div>
+    <div class="preview" id="prev-agent">
+      <div class="preview-header"><div class="preview-tag">Existing</div><div class="preview-title">Agent</div><div class="preview-desc">Bereits implementiert — 11 Tools, Claude WebSocket. Erweiterbar mit 5 neuen ML-Tools.</div></div>
+      <div class="why"><div class="why-label">Status</div><div class="why-text">Nach ML: find_similar, get_sentiment_trend, detect_anomalies, get_clusters, forecast_metric hinzufügen.</div></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function show(page, el) {
+  document.querySelectorAll('.preview').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('prev-' + page).classList.add('active');
+  el.classList.add('active');
+}
+</script>
