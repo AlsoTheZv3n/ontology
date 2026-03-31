@@ -36,6 +36,7 @@ services:
       REDIS_URL: redis://redis:6379
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ALPHA_VANTAGE_KEY: ${ALPHA_VANTAGE_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
       FRED_API_KEY: ${FRED_API_KEY:-}
       EIA_API_KEY: ${EIA_API_KEY:-}
     depends_on:
@@ -57,6 +58,7 @@ services:
       DATABASE_URL: postgresql://ontology:ontology@postgres:5432/ontology
       REDIS_URL: redis://redis:6379
       ALPHA_VANTAGE_KEY: ${ALPHA_VANTAGE_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
       FRED_API_KEY: ${FRED_API_KEY:-}
       EIA_API_KEY: ${EIA_API_KEY:-}
     depends_on:

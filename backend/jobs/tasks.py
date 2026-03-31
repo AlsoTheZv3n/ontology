@@ -932,3 +932,68 @@ async def compute_clusters(ctx: dict) -> int:
                     _json.dumps({"cluster_id": cluster_id}), key,
                 )
     return len(keys)
+
+
+async def sync_finnhub(ctx: dict) -> int:
+    """Sync Finnhub data: insider transactions, earnings, analyst recommendations."""
+    from connectors.finnhub import FinnhubConnector
+    from config import settings as _s
+    import json as _json
+
+    if not _s.finnhub_api_key:
+        logger.warning("FINNHUB_API_KEY not set, skipping")
+        return 0
+
+    pool: asyncpg.Pool = ctx["pool"]
+    redis_client: aioredis.Redis = ctx["redis"]
+    conn = FinnhubConnector(redis_client, api_key=_s.finnhub_api_key)
+    writer = OntologyWriter(pool)
+    count = 0
+
+    for company in COMPANIES:
+        ticker = company.get("ticker")
+        if not ticker:
+            continue
+        try:
+            # Earnings surprises
+            earnings = await conn.fetch_earnings(ticker, limit=4)
+            if isinstance(earnings, list) and earnings:
+                latest = earnings[0]
+                props = {
+                    "earnings_actual": latest.get("actual"),
+                    "earnings_estimate": latest.get("estimate"),
+                    "earnings_surprise_pct": latest.get("surprisePercent"),
+                    "earnings_period": latest.get("period"),
+                }
+                from schemas.objects import CompanyObject
+                obj = CompanyObject(
+                    key=_canonical(company),
+                    properties={k: v for k, v in props.items() if v is not None},
+                    sources={"finnhub_earnings": latest},
+                )
+                await writer.upsert(obj)
+
+            # Analyst recommendations
+            recs = await conn.fetch_recommendation(ticker)
+            if isinstance(recs, list) and recs:
+                latest = recs[0]
+                from schemas.objects import CompanyObject
+                obj = CompanyObject(
+                    key=_canonical(company),
+                    properties={
+                        "analyst_buy": latest.get("buy", 0),
+                        "analyst_hold": latest.get("hold", 0),
+                        "analyst_sell": latest.get("sell", 0),
+                        "analyst_strong_buy": latest.get("strongBuy", 0),
+                    },
+                    sources={"finnhub_recommendation": latest},
+                )
+                await writer.upsert(obj)
+
+            count += 1
+            import asyncio
+            await asyncio.sleep(0.5)  # rate limit: 60 calls/min
+        except Exception:
+            logger.exception("Finnhub sync failed for %s", ticker)
+
+    return count
